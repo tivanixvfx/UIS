@@ -1,0 +1,45 @@
+/* Keep the vibe similar to your earlier version */
+:root{
+  --bg:#0b1220; --card:#121a2b; --muted:#8aa0c6; --text:#e8eefc;
+  --accent:#87b7ff; --pill:#1a2440; --border:#223259;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#0b1220,#0e1528 40%,#0b1220);color:var(--text);font-family:system-ui,Segoe UI,Inter,Roboto,Arial}
+.wrap{max-width:1050px;margin:0 auto;padding:18px 16px}
+h1{margin:0 0 6px}
+.sub{color:var(--muted);font-size:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mtb-6-12{margin:6px 0 12px}
+.mt-12{margin-top:12px}
+.mt-8{margin-top:8px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+input,select,button,textarea{font:inherit}
+input[type=text],input[type=url],select,textarea{
+  background:#0f1a31;border:1px solid #25345c;color:var(--text);
+  padding:10px 12px;border-radius:10px;outline:none
+}
+.primary{
+  background:linear-gradient(180deg,#2b64ff,#224ccd);color:#fff;border:1px solid #2142a3;
+  border-radius:12px;padding:10px 14px;cursor:pointer
+}
+.ghost{
+  background:transparent;border:1px solid #2a3964;color:var(--text);
+  border-radius:12px;padding:10px 14px;cursor:pointer
+}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.link{color:var(--accent);text-decoration:none}
+.footer{margin-top:auto;display:flex;align-items:center;gap:10px}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;
+  background:var(--pill);border:1px solid #2a3964;color:#bcd0ff;font-size:12px
+}
+.pillbar{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.pagination{display:flex;gap:8px;align-items:center;justify-content:center;margin:12px 0}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(5,8,16,.65);display:none;place-items:center;padding:16px}
+.modal.open{display:grid}
+.sheet{width:min(680px,92vw);background:var(--card);border:1px solid #2a3964;border-radius:18px;padding:16px}
+.hr{height:1px;background:#233358;margin:12px 0}

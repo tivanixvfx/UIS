@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UIS Resource Hub</title>
+
+  <!-- Styles (keep your look here) -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Supabase client -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    /* Your real Supabase values */
+    window.SUPABASE_URL = "https://wtjcfgbgejlmpnfpyabp.supabase.co";
+    window.SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0amNmZ2JnZWpsbXBuZnB5YWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMzM3MzksImV4cCI6MjA3MzkwOTczOX0.4up1wVs0Go-EZOi0rwg6GA0Duvgv4cGyqP9kK6YhWzs";
+  </script>
+
+  <!-- App code -->
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="wrap">
+    <h1>UIS Resource Hub</h1>
+    <div class="sub">Find and share useful links for classes, tools, and campus life, in UIS.</div>
+    <div class="row mt-12">
+      <input id="q" type="text" placeholder="Search by title, tag, or URL…" />
+      <select id="cat"></select>
+      <select id="sub"></select>
+      <select id="tag"></select>
+      <button id="addBtn" class="primary">＋ Add resource</button>
+
+      <!-- Auth buttons (JS toggles visibility) -->
+      <button id="loginGoogle" class="ghost">Sign in with Google</button>
+      <button id="devLogin" class="ghost">Dev login (email/pass)</button>
+      <button id="logoutBtn" class="ghost" style="display:none">Sign out</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="pillbar" id="catChips"></div>
+    <div id="count" class="muted small mtb-6-12"></div>
+    <div id="empty" class="muted small" style="display:none;margin:10px 0;">
+      No resources yet — be the first to submit!
+    </div>
+    <section class="grid" id="list"></section>
+    <div class="pagination" id="pager"></div>
+  </main>
+
+  <!-- Add Resource Modal (hidden by default) -->
+  <div class="modal" id="modal" style="display:none">
+    <div class="sheet">
+      <h3>Suggest a resource</h3>
+      <div class="row">
+        <input id="titleI" type="text" placeholder="Title (e.g., Khan Academy – Algebra)" class="flex-2" />
+        <input id="urlI" type="url" placeholder="URL (https://…)" class="flex-2" />
+      </div>
+      <div class="row mt-8">
+        <select id="catI"></select>
+        <input id="subI" type="text" placeholder="Subcategory (e.g., Algebra)" />
+        <input id="tagsI" type="text" placeholder="Tags (comma separated)" />
+      </div>
+      <textarea id="descI" placeholder="Why is this helpful? Short description…"></textarea>
+      <div class="hr"></div>
+      <div class="row justify-end">
+        <button class="ghost" id="cancel">Cancel</button>
+        <button class="primary" id="save">Save</button>
+      </div>
+      <div class="small muted">Appears instantly (must be signed in). You can add moderation later.</div>
+    </div>
+  </div>
+</body>
+</html>
