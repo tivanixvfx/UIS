@@ -1,19 +1,31 @@
-/* ---------------- Supabase init ---------------- */
+/* ====== Supabase ====== */
 const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON);
 let session = (await supabase.auth.getSession()).data.session || null;
+let isAdmin = false;
 
 supabase.auth.onAuthStateChange(async (_evt, s) => {
   session = s;
+  await refreshAdminFlag();
   toggleAuthButtons();
-  await ensureProfile();
   await reload();
 });
+
+async function refreshAdminFlag(){
+  if (!session) { isAdmin = false; return; }
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', session.user.id)
+    .single();
+  if (error) { console.warn(error); isAdmin = false; return; }
+  isAdmin = !!data?.is_admin;
+}
 
 async function ensureProfile(){
   if (!session) return;
   const { user } = session;
-  // create profile row if missing
-  const { data, error } = await supabase.from('profiles').select('id').eq('id', user.id).single();
+  const { data, error } = await supabase
+    .from('profiles').select('id').eq('id', user.id).single();
   if (error && error.code !== 'PGRST116') console.warn(error);
   if (!data) {
     await supabase.from('profiles').insert({
@@ -24,7 +36,7 @@ async function ensureProfile(){
   }
 }
 
-/* ---------------- Elements ---------------- */
+/* ====== Elements ====== */
 const els = {
   q: document.getElementById('q'),
   cat: document.getElementById('cat'),
@@ -47,12 +59,11 @@ const els = {
   save: document.getElementById('save'),
   cancel: document.getElementById('cancel'),
 
-  loginGoogle: document.getElementById('loginGoogle'),
-  devLogin: document.getElementById('devLogin'),
+  adminLogin: document.getElementById('adminLogin'),
   logoutBtn: document.getElementById('logoutBtn'),
 };
 
-/* ---------------- Data/Filters ---------------- */
+/* ====== Data/Filters ====== */
 const CATS = [
   { id:'all', name:'All', subs:[] },
   { id:'admin', name:'School Admin', subs:['Calendar','Clubs','Counseling'] },
@@ -62,7 +73,6 @@ const CATS = [
   { id:'writing', name:'Writing', subs:['Grammar','Essays','Citations'] },
   { id:'wellness', name:'Wellness', subs:['Mental Health','Fitness','Nutrition'] },
 ];
-
 let items = [];
 const state = { q:'', cat:'all', sub:'', tag:'', page:1, pageSize:9 };
 
@@ -74,7 +84,7 @@ function setupFilters(){
   fillSelect(els.catI, CATS.filter(c=>c.id!=='all').map(c=>({label:c.name, value:c.id})));
 }
 
-/* ---------------- DB ---------------- */
+/* ====== DB ====== */
 async function fetchResources(){
   const { data, error } = await supabase
     .from('resources')
@@ -83,7 +93,7 @@ async function fetchResources(){
     .order('title', { ascending:true });
   if (error) { console.error(error); return []; }
   return (data||[]).map(r=>({
-    id:r.id, user_id:r.user_id, title:r.title, url:r.url,
+    id:r.id, user_id:r.user_id || null, title:r.title, url:r.url,
     category:r.category, sub:r.subcategory||'',
     tags:r.tags||[], description:r.description||'',
     votes:r.votes||0
@@ -94,7 +104,7 @@ async function reload(){
   render();
 }
 
-/* ---------------- Render ---------------- */
+/* ====== Render ====== */
 function labelOf(id){ return (CATS.find(c=>c.id===id)||{}).name || id; }
 function computeTags(){ const s=new Set(); items.forEach(r=> (r.tags||[]).forEach(t=> s.add(t))); return Array.from(s).sort(); }
 
@@ -151,7 +161,8 @@ function render(){
     const title=document.createElement('a'); title.href=r.url; title.target='_blank'; title.rel='noopener'; title.className='link'; title.textContent=r.title;
     top.append(title);
 
-    if(session?.user?.id === r.user_id){
+    // admin-only delete button (UI) – DB also enforces it with RLS
+    if(isAdmin){
       const del=document.createElement('button'); del.className='ghost'; del.textContent='Delete';
       del.onclick=async()=>{ if(!confirm('Delete this resource?'))return;
         const { error }=await supabase.from('resources').delete().eq('id', r.id);
@@ -194,9 +205,9 @@ function render(){
   }
 }
 
-/* ---------------- Events ---------------- */
+/* ====== Events ====== */
 function openModal(show){ els.modal.style.display = show ? 'grid' : 'none'; if (show) setTimeout(()=> els.titleI?.focus(),0); }
-els.addBtn.onclick = ()=> session ? openModal(true) : alert('Please sign in first.');
+els.addBtn.onclick = ()=> openModal(true);
 els.cancel.onclick = ()=> openModal(false);
 els.q.oninput = e=>{ state.q=e.target.value; state.page=1; render(); };
 els.cat.onchange = e=>{ state.cat=e.target.value; state.sub=''; state.page=1; render(); };
@@ -204,7 +215,6 @@ els.sub.onchange = e=>{ state.sub=e.target.value; state.page=1; render(); };
 els.tag.onchange = e=>{ state.tag=e.target.value; state.page=1; render(); };
 
 els.save.onclick = async () => {
-  if (!session) return alert('Please sign in first.');
   const title=els.titleI.value.trim();
   const url=els.urlI.value.trim();
   const category=els.catI.value;
@@ -214,7 +224,8 @@ els.save.onclick = async () => {
   if(!title || !url || !category) return alert('Please fill title, URL, and category.');
 
   const { error } = await supabase.from('resources').insert({
-    user_id: session.user.id, title, url, category,
+    user_id: session?.user?.id || null,
+    title, url, category,
     subcategory: sub, tags, description
   });
   if (error) return alert(error.message);
@@ -224,42 +235,44 @@ els.save.onclick = async () => {
   await reload();
 };
 
-/* ---------------- Auth ---------------- */
+/* ====== Admin auth (email/password) ====== */
 function toggleAuthButtons(){
   const logged = !!session;
-  els.loginGoogle.style.display = logged ? 'none' : '';
-  els.devLogin.style.display    = logged ? 'none' : '';
-  els.logoutBtn.style.display   = logged ? '' : 'none';
+  els.adminLogin.style.display = logged ? 'none' : '';
+  els.logoutBtn.style.display  = logged ? '' : 'none';
 }
 
-// Google (works after you set Auth → URL Configuration and Provider → Google)
-els.loginGoogle.onclick = async () => {
-  const { error } = await supabase.auth.signInWithOAuth({ provider:'google' });
-  if (error) alert(error.message);
-};
+els.adminLogin.onclick = async () => {
+  const email = prompt('Admin email:'); if (!email) return;
+  const password = prompt('Admin password:'); if (!password) return;
 
-// Dev login for local testing (Email/Password)
-els.devLogin.onclick = async () => {
-  const email = prompt('Email:'); if (!email) return;
-  const password = prompt('Password (create one if first time):'); if (!password) return;
-
-  let { error } = await supabase.auth.signInWithPassword({ email, password });
+  // Try sign-in first
+  let { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error && error.status === 400) {
+    // If not existing, create account (then set is_admin=true in Table Editor)
     const up = await supabase.auth.signUp({ email, password });
-    if (up.error) return alert(up.error.message);
-    alert('Account created. Click Dev login again to sign in.');
+    if (up.error) return alert("Sign-up failed: " + up.error.message);
+    alert('Account created. In Supabase → Table Editor → profiles, set is_admin=true on your row, then sign in again.');
     return;
   }
-  if (error) return alert(error.message);
+  if (error) return alert("Sign-in failed: " + error.message);
+
+  await ensureProfile();
+  await refreshAdminFlag();
+  toggleAuthButtons();
+  await reload();
 };
 
-// Logout
-els.logoutBtn.onclick = async () => { await supabase.auth.signOut(); };
+els.logoutBtn.onclick = async () => {
+  await supabase.auth.signOut();
+  isAdmin = false;
+  toggleAuthButtons();
+  await reload();
+};
 
-/* ---------------- Boot ---------------- */
+/* ====== Boot ====== */
 setupFilters();
+await refreshAdminFlag();
 toggleAuthButtons();
-await ensureProfile(); // no-op if not logged in
 await reload();
 els.cat.value = state.cat;
-
