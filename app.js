@@ -72,6 +72,13 @@ const CATS = [
   { id:'computing', name:'Computing', subs:['Web Dev','Python','AI'] },
   { id:'writing', name:'Writing', subs:['Grammar','Essays','Citations'] },
   { id:'wellness', name:'Wellness', subs:['Mental Health','Fitness','Nutrition'] },
+
+  // New category for course codes
+  { id:'courses', name:'Courses', subs:[
+    'ESLBO','ESLCO','ESLDO','ENG2D','ENG3U','ENG4U','CGC1W','MCR3U','SPH3U',
+    'SBI4U','AWQ3M','AWQ4M','BBB4M','ESLEO','SNC1W','SNC2D','MPM2D','PPL2O',
+    'CHC2D','MHF4U','SCH3U','SCH4U','TGJ4M','CGW4U','HIF2O','OLC4O','MCV4U'
+  ]},
 ];
 let items = [];
 const state = { q:'', cat:'all', sub:'', tag:'', page:1, pageSize:9 };
