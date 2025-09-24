@@ -63,6 +63,10 @@ const els = {
   logoutBtn: document.getElementById('logoutBtn'),
 };
 
+// util: small debounce to reduce re-renders during typing
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+
+
 /* ====== Data/Filters ====== */
 const CATS = [
   { id:'all', name:'All', subs:[] },
@@ -73,7 +77,7 @@ const CATS = [
   { id:'writing', name:'Writing', subs:['Grammar','Essays','Citations'] },
   { id:'wellness', name:'Wellness', subs:['Mental Health','Fitness','Nutrition'] },
 
-  // New category for course codes
+  // New category for Course Codes
   { id:'courses', name:'Courses', subs:[
     'ESLBO','ESLCO','ESLDO','ENG2D','ENG3U','ENG4U','CGC1W','MCR3U','SPH3U',
     'SBI4U','AWQ3M','AWQ4M','BBB4M','ESLEO','SNC1W','SNC2D','MPM2D','PPL2O',
@@ -81,6 +85,7 @@ const CATS = [
   ]},
 ];
 let items = [];
+let tagCache = [];
 const state = { q:'', cat:'all', sub:'', tag:'', page:1, pageSize:9 };
 
 function fillSelect(sel, opts){ sel.innerHTML=''; opts.forEach(o=> sel.append(new Option(o.label,o.value))); }
@@ -99,7 +104,9 @@ async function fetchResources(){
     .order('votes', { ascending:false })
     .order('title', { ascending:true });
   if (error) { console.error(error); return []; }
-  return (data||[]).map(r=>({
+  return (data||[])
+    .filter(r => isAdmin || r.approved === true)
+    .map(r=>({
     id:r.id, user_id:r.user_id || null, title:r.title, url:r.url,
     category:r.category, sub:r.subcategory||'',
     tags:r.tags||[], description:r.description||'',
@@ -108,12 +115,14 @@ async function fetchResources(){
 }
 async function reload(){
   items = await fetchResources();
+  const s = new Set(); items.forEach(r => (r.tags||[]).forEach(t => s.add(t)));
+  tagCache = Array.from(s).sort();
   render();
 }
 
 /* ====== Render ====== */
 function labelOf(id){ return (CATS.find(c=>c.id===id)||{}).name || id; }
-function computeTags(){ const s=new Set(); items.forEach(r=> (r.tags||[]).forEach(t=> s.add(t))); return Array.from(s).sort(); }
+function computeTags(){ return tagCache; }
 
 function filtered(){
   let list=[...items];
@@ -216,7 +225,7 @@ function render(){
 function openModal(show){ els.modal.style.display = show ? 'grid' : 'none'; if (show) setTimeout(()=> els.titleI?.focus(),0); }
 els.addBtn.onclick = ()=> openModal(true);
 els.cancel.onclick = ()=> openModal(false);
-els.q.oninput = e=>{ state.q=e.target.value; state.page=1; render(); };
+els.q.oninput = debounce(e=>{ state.q=e.target.value; state.page=1; render(); }, 150);
 els.cat.onchange = e=>{ state.cat=e.target.value; state.sub=''; state.page=1; render(); };
 els.sub.onchange = e=>{ state.sub=e.target.value; state.page=1; render(); };
 els.tag.onchange = e=>{ state.tag=e.target.value; state.page=1; render(); };
@@ -229,11 +238,13 @@ els.save.onclick = async () => {
   const tags=els.tagsI.value.split(',').map(s=>s.trim()).filter(Boolean);
   const description=els.descI.value.trim();
   if(!title || !url || !category) return alert('Please fill title, URL, and category.');
+  if(!/^https?:\/\//i.test(url)) return alert('URL must start with http:// or https://');
+  const subNorm = (category==='courses') ? (els.subI.value.trim().toUpperCase()) : (els.subI.value.trim());
 
   const { error } = await supabase.from('resources').insert({
     user_id: session?.user?.id || null,
     title, url, category,
-    subcategory: sub, tags, description
+    subcategory: subNorm, tags, description
   });
   if (error) return alert(error.message);
 
