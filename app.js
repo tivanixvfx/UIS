@@ -61,7 +61,11 @@ const els = {
 
   adminLogin: document.getElementById('adminLogin'),
   logoutBtn: document.getElementById('logoutBtn'),
+
+  // NEW: wire up the footer link so JS can access it if needed
+  feedbackLink: document.getElementById('feedbackLink'),
 };
+
 
 // util: small debounce to reduce re-renders during typing
 function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
