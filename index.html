@@ -7,7 +7,7 @@
 
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" type="image/png" href="./assets/Uis.png?v=2">
-  <a href="https://docs.google.com/forms/d/e/1FAIpQLSe-pZFxPiXsyy53qCLOuN82-9gplif_TpVXt_VF877b2G9W3w/viewform?usp=sharing&ouid=107599033470817781782" ...>Feedback</a>
+  <link rel="apple-touch-icon" href="/assets/Uis.png" />
 
 
   <!-- Supabase client -->
@@ -87,3 +87,15 @@
 
 </body>
 </html>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const feedbackLink = document.getElementById("feedbackLink");
+  if (feedbackLink) {
+    feedbackLink.href = "https://docs.google.com/forms/d/your-form-id/viewform"; // your form link
+    feedbackLink.target = "_blank";
+    feedbackLink.rel = "noopener noreferrer";
+  }
+});
+</script>
+
