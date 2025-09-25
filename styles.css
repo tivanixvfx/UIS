@@ -42,33 +42,12 @@ input[type=text],input[type=url],select,textarea{
 .modal.open{display:grid}
 .sheet{width:min(680px,92vw);background:var(--card);border:1px solid #2a3964;border-radius:18px;padding:16px}
 .hr{height:1px;background:#233358;margin:12px 0}
-/* === Feedback Button (bottom-right) === */
-.feedback-btn{
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 1000;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 14px;
-  border-radius: 9999px;
-  background: var(--accent, #2563eb);
-  color: #fff;
-  font-weight: 600;
-  text-decoration: none;
-  box-shadow: 0 6px 18px rgba(0,0,0,.15);
-  transition: transform .08s ease, box-shadow .2s ease, background .2s ease;
-}
-.feedback-btn:hover{
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(0,0,0,.18);
-}
-.feedback-btn:active{
-  transform: translateY(0);
-  box-shadow: 0 4px 12px rgba(0,0,0,.18);
-}
-@media (max-width: 480px){
-  .feedback-btn{ right: 12px; bottom: 12px; padding: 10px 12px; }
-}
+.footer{ margin-top:auto; display:flex; align-items:center; gap:10px }
+
+/* Footer */
+.site-footer{ border-top:1px solid #243153; background:#0b1220; }
+.footer-inner{ display:flex; gap:10px; align-items:center; justify-content:center; padding:16px; color:var(--muted); }
+.footer-inner .dot{ opacity:.5 }
+.version{ opacity:.7 }
+.link{ color:var(--accent); text-decoration:none } 
 
