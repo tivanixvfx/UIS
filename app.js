@@ -294,3 +294,9 @@ await refreshAdminFlag();
 toggleAuthButtons();
 await reload();
 els.cat.value = state.cat;
+
+// Feedback link (swap with your Google Form or mailto)
+els.feedbackLink?.addEventListener('click', (e) => {
+  e.preventDefault();
+  window.open('https://docs.google.com/forms/d/e/1FAIpQLSe-pZFxPiXsyy53qCLOuN82-9gplif_TpVXt_VF877b2G9W3w/viewform?usp=sharing&ouid=107599033470817781782', '_blank');
+});
