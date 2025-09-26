@@ -1,21 +1,11 @@
 /* =========================
-   UIS Resource Hub — robust app.js
+   UIS Resource Hub — stable app.js (beginner-safe)
    ========================= */
 
-/* ====== Supabase Client ====== */
+/* ---- Supabase client (already defined in index.html) ---- */
 const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON);
 
-/* ====== Global error visibility (so it never "fails silently") ====== */
-function showStatus(msg) {
-  const el = document.getElementById('count');
-  if (!el) return;
-  el.textContent = msg;
-  el.style.color = '#ff6b6b';
-}
-window.addEventListener('error', (e) => { console.error(e.error || e.message); showStatus('Script error: ' + (e.message || 'see console')); });
-window.addEventListener('unhandledrejection', (e) => { console.error(e.reason); showStatus('Runtime error: ' + (e.reason?.message || 'see console')); });
-
-/* ====== Safe session getter (Chrome refresh can hang) ====== */
+/* ---- Session getter with a safety timeout (avoids Chrome hangs) ---- */
 async function getSessionSafe(ms = 3500) {
   try {
     return await Promise.race([
@@ -29,9 +19,22 @@ async function getSessionSafe(ms = 3500) {
 let session = (await getSessionSafe()).data.session || null;
 let isAdmin = false;
 
+/* ---- Show status text (so you see what’s happening) ---- */
+function setStatus(msg, color = '#9aa3b2') {
+  const el = document.getElementById('count');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = color;
+}
+
+/* ---- Make errors visible (no more silent blank page) ---- */
+window.addEventListener('error', e => { console.error(e.message || e.error); setStatus('Error loading page. See Console.', '#ff6b6b'); });
+window.addEventListener('unhandledrejection', e => { console.error(e.reason); setStatus('Error loading data. See Console.', '#ff6b6b'); });
+
+/* ---- Auth state changes ---- */
 supabase.auth.onAuthStateChange(async (_evt, s) => {
   session = s;
-  await refreshAdminFlag().catch(console.warn);
+  await refreshAdminFlag();
   toggleAuthButtons();
   await reload();
 });
@@ -64,12 +67,12 @@ const els = {
   feedbackLink: document.getElementById('feedbackLink'),
 };
 
-/* ====== Utils ====== */
-function debounce(fn, ms) { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+/* ====== Small helpers ====== */
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 function fillSelect(sel, opts){ sel.innerHTML=''; opts.forEach(o=> sel.append(new Option(o.label,o.value))); }
 function labelOf(id){ return (CATS.find(c=>c.id===id)||{}).name || id; }
 
-/* ====== Categories ====== */
+/* ====== Categories (with your course codes) ====== */
 const CATS = [
   { id:'all', name:'All', subs:[] },
   { id:'admin', name:'School Admin', subs:['Calendar','Clubs','Counseling'] },
@@ -91,12 +94,20 @@ let items = [];
 let totalCount = 0;
 let tagCache = [];
 
-/* ====== Profile/Admin ====== */
+/* ====== Build filter controls ====== */
+function setupFilters(){
+  fillSelect(els.cat, CATS.map(c=>({label:c.name, value:c.id})));
+  fillSelect(els.sub, [{label:'Any subcategory', value:''}]);
+  fillSelect(els.tag, [{label:'Any tag', value:''}]);
+  fillSelect(els.catI, CATS.filter(c=>c.id!=='all').map(c=>({label:c.name, value:c.id})));
+}
+
+/* ====== Admin/profile ====== */
 async function refreshAdminFlag(){
-  if (!session) { isAdmin = false; return; }
+  if (!session) { isAdmin=false; return; }
   const { data, error } = await supabase
     .from('profiles').select('is_admin').eq('id', session.user.id).single();
-  if (error) { console.warn('[profiles]', error); isAdmin = false; return; }
+  if (error) { console.warn(error); isAdmin=false; return; }
   isAdmin = !!data?.is_admin;
 }
 async function ensureProfile(){
@@ -104,14 +115,14 @@ async function ensureProfile(){
   const { user } = session;
   const { data, error } = await supabase
     .from('profiles').select('id').eq('id', user.id).single();
-  if (error && error.code !== 'PGRST116') console.warn(error);
+  if (!data && !error) return;
   if (!data) await supabase.from('profiles').insert({
     id: user.id, full_name: user.user_metadata?.name || '', email: user.email
   });
 }
 
-/* ====== Server fetch (with graceful fallback) ====== */
-async function fetchResourcesServer() {
+/* ====== Server fetch (filtered + paged). Falls back if needed. ====== */
+async function fetchResources(){
   const { q, cat, sub, tag, page, pageSize } = state;
   const from = (page - 1) * pageSize;
   const to   = from + pageSize - 1;
@@ -120,62 +131,57 @@ async function fetchResourcesServer() {
     .select('id,user_id,title,url,category,subcategory,tags,description,votes,approved,created_at', { count: 'exact' });
 
   if (!isAdmin) query = query.eq('approved', true);
-  if (cat && cat !== 'all') query = query.eq('category', cat);
+  if (cat && cat!=='all') query = query.eq('category', cat);
   if (sub) query = query.eq('subcategory', sub);
   if (tag) query = query.contains('tags', [tag]);
-
-  // Known flaky area: PostgREST OR+ILIKE across multiple fields behind RLS.
-  if (q) {
-    const like = `%${q}%`;
-    // Try the OR; if backend blocks it, we'll catch and retry a simpler filter.
-    query = query.or(`title.ilike.${like},description.ilike.${like},url.ilike.${like}`);
-  }
+  if (q)  { const like = `%${q}%`; query = query.or(`title.ilike.${like},description.ilike.${like},url.ilike.${like}`); }
 
   query = query.order('votes', { ascending:false }).order('title', { ascending:true }).range(from, to);
 
+  // Try main query
+  let data, error, count;
   try {
-    const { data, error, count } = await query;
+    const res = await Promise.race([
+      query,
+      new Promise((_,rej)=> setTimeout(()=> rej(new Error('Request timeout')), 10000))
+    ]);
+    data = res.data; error = res.error; count = res.count;
     if (error) throw error;
-    const normalized = (data||[]).map(r=>({
-      id:r.id, user_id:r.user_id||null, title:r.title, url:r.url,
-      category:r.category, sub:r.subcategory||'',
-      tags:r.tags||[], description:r.description||'',
-      votes:r.votes||0
-    }));
-    return { items: normalized, count: count||0 };
-  } catch (err) {
-    console.warn('[fetchResourcesServer] fallback path due to:', err?.message || err);
-    // Fallback: fetch page without OR-search, then client-filter by q
+  } catch (e) {
+    // Fallback: same query minus the OR search (do local search if q exists)
+    console.warn('[fallback fetch]', e?.message || e);
     let q2 = supabase.from('resources')
       .select('id,user_id,title,url,category,subcategory,tags,description,votes,approved,created_at', { count: 'exact' });
     if (!isAdmin) q2 = q2.eq('approved', true);
-    if (cat && cat !== 'all') q2 = q2.eq('category', cat);
+    if (cat && cat!=='all') q2 = q2.eq('category', cat);
     if (sub) q2 = q2.eq('subcategory', sub);
     if (tag) q2 = q2.contains('tags', [tag]);
     q2 = q2.order('votes', { ascending:false }).order('title', { ascending:true }).range(from, to);
 
-    const { data: d2, error: e2, count: c2 } = await q2;
-    if (e2) { console.error('[fallback fetch]', e2); return { items: [], count: 0 }; }
-    let pageItems = (d2||[]).map(r=>({
-      id:r.id, user_id:r.user_id||null, title:r.title, url:r.url,
-      category:r.category, sub:r.subcategory||'',
-      tags:r.tags||[], description:r.description||'',
-      votes:r.votes||0
-    }));
-    // client-side q if provided
+    const res2 = await q2;
+    data = res2.data; error = res2.error; count = res2.count;
+    if (error) { console.error(error); return { items: [], count: 0 }; }
     if (q) {
       const qq = q.toLowerCase();
-      pageItems = pageItems.filter(r =>
-        r.title.toLowerCase().includes(qq) ||
-        r.description.toLowerCase().includes(qq) ||
+      data = (data||[]).filter(r =>
+        r.title?.toLowerCase().includes(qq) ||
+        r.description?.toLowerCase().includes(qq) ||
         (r.tags||[]).some(t => t.toLowerCase().includes(qq)) ||
-        r.url.toLowerCase().includes(qq)
+        r.url?.toLowerCase().includes(qq)
       );
     }
-    return { items: pageItems, count: c2||pageItems.length };
   }
+
+  const normalized = (data||[]).map(r=>({
+    id:r.id, user_id:r.user_id||null, title:r.title, url:r.url,
+    category:r.category, sub:r.subcategory||'',
+    tags:r.tags||[], description:r.description||'',
+    votes:r.votes||0
+  }));
+  return { items: normalized, count: count || normalized.length };
 }
 
+/* ====== Tag cache ====== */
 function refreshTagCacheFrom(list) {
   const s = new Set(tagCache);
   list.forEach(r => (r.tags||[]).forEach(t => s.add(t)));
@@ -183,37 +189,12 @@ function refreshTagCacheFrom(list) {
 }
 function computeTags(){ return tagCache; }
 
-/* ====== Single-flight reload ====== */
-let _reloading = false;
-async function reload() {
-  if (_reloading) return;
-  _reloading = true;
-  try {
-    const { items: pageItems, count } = await fetchResourcesServer();
-    items = pageItems; totalCount = count;
-    refreshTagCacheFrom(items);
-    render();
-  } catch (e) {
-    console.error('[reload]', e);
-    showStatus('Network/auth issue — see console for details.');
-  } finally {
-    _reloading = false;
-  }
-}
-
-/* ====== UI ====== */
-function setupFilters(){
-  fillSelect(els.cat, CATS.map(c=>({label:c.name, value:c.id})));
-  fillSelect(els.sub, [{label:'Any subcategory', value:''}]);
-  fillSelect(els.tag, [{label:'Any tag', value:''}]);
-  fillSelect(els.catI, CATS.filter(c=>c.id!=='all').map(c=>({label:c.name, value:c.id})));
-}
-
+/* ====== Render ====== */
 function render(){
   toggleAuthButtons();
 
   // sub options per category
-  const catObj = CATS.find(c => c.id === state.cat);
+  const catObj = CATS.find(c=> c.id===state.cat);
   const subOpts = [{label:'Any subcategory', value:''}, ...(catObj?.subs||[]).map(s=>({label:s, value:s}))];
   fillSelect(els.sub, subOpts); els.sub.value = state.sub;
 
@@ -222,7 +203,7 @@ function render(){
   els.tag.value = state.tag;
 
   // chips
-  els.chips.innerHTML = '';
+  els.chips.innerHTML='';
   CATS.forEach(c=>{
     const b=document.createElement('button'); b.textContent=c.name; b.className='badge';
     if(state.cat===c.id) b.style.outline='2px solid #3459b6';
@@ -230,49 +211,49 @@ function render(){
     els.chips.append(b);
   });
 
-  const list = items; // already server-filtered for this page
-  els.count.textContent = `${totalCount} result${totalCount!==1?'s':''} • page ${state.page}`;
-  els.empty.style.display = totalCount ? 'none' : '';
-
-  // cards
+  // list area
   els.list.innerHTML='';
-  list.forEach(r=>{
-    const card=document.createElement('article'); card.className='card';
+  if (!items.length) {
+    els.empty.style.display = '';
+  } else {
+    els.empty.style.display = 'none';
+    items.forEach(r=>{
+      const card=document.createElement('article'); card.className='card';
 
-    const top=document.createElement('div'); top.className='row';
-    const title=document.createElement('a');
-    title.href=r.url; title.target='_blank'; title.rel='noopener'; title.className='link'; title.textContent=r.title;
-    top.append(title);
+      const top=document.createElement('div'); top.className='row';
+      const title=document.createElement('a'); title.href=r.url; title.target='_blank'; title.rel='noopener'; title.className='link'; title.textContent=r.title;
+      top.append(title);
 
-    if(isAdmin){
-      const del=document.createElement('button'); del.className='ghost'; del.textContent='Delete';
-      del.onclick=async()=>{ if(!confirm('Delete this resource?'))return;
-        const { error }=await supabase.from('resources').delete().eq('id', r.id);
-        if(error) return alert(error.message);
-        await reload();
-      };
-      top.append(del);
-    }
-    card.append(top);
+      if(isAdmin){
+        const del=document.createElement('button'); del.className='ghost'; del.textContent='Delete';
+        del.onclick=async()=>{ if(!confirm('Delete this resource?'))return;
+          const { error }=await supabase.from('resources').delete().eq('id', r.id);
+          if(error) return alert(error.message);
+          await reload();
+        };
+        top.append(del);
+      }
+      card.append(top);
 
-    const meta=document.createElement('div'); meta.className='muted small';
-    meta.textContent=`${labelOf(r.category)}${r.sub ? ' • '+r.sub : ''}`;
-    card.append(meta);
+      const meta=document.createElement('div'); meta.className='muted small';
+      meta.textContent=`${labelOf(r.category)}${r.sub ? ' • '+r.sub : ''}`;
+      card.append(meta);
 
-    if(r.description){ const d=document.createElement('div'); d.textContent=r.description; card.append(d); }
+      if(r.description){ const d=document.createElement('div'); d.textContent=r.description; card.append(d); }
 
-    if(r.tags?.length){
-      const tagWrap=document.createElement('div');
-      r.tags.forEach(t=>{ const chip=document.createElement('span'); chip.className='badge'; chip.textContent='#'+t; chip.onclick=()=>{ state.tag=t; state.page=1; reload(); }; tagWrap.append(chip); });
-      card.append(tagWrap);
-    }
+      if(r.tags?.length){
+        const tagWrap=document.createElement('div');
+        r.tags.forEach(t=>{ const chip=document.createElement('span'); chip.className='badge'; chip.textContent='#'+t; chip.onclick=()=>{ state.tag=t; state.page=1; reload(); }; tagWrap.append(chip); });
+        card.append(tagWrap);
+      }
 
-    const foot=document.createElement('div'); foot.className='footer';
-    const open=document.createElement('a'); open.href=r.url; open.target='_blank'; open.rel='noopener'; open.className='badge'; open.textContent='Open link ↗';
-    foot.append(open); card.append(foot);
+      const foot=document.createElement('div'); foot.className='footer';
+      const open=document.createElement('a'); open.href=r.url; open.target='_blank'; open.rel='noopener'; open.className='badge'; open.textContent='Open link ↗';
+      foot.append(open); card.append(foot);
 
-    els.list.append(card);
-  });
+      els.list.append(card);
+    });
+  }
 
   // pager
   const pages=Math.max(1, Math.ceil(totalCount/state.pageSize));
@@ -285,6 +266,28 @@ function render(){
     next.onclick=()=>{ state.page=Math.min(pages,state.page+1); reload(); };
     els.pager.append(prev,info,next);
   }
+
+  // status line
+  setStatus(`${totalCount} result${totalCount!==1?'s':''} • page ${state.page}`);
+}
+
+/* ====== Reload (single-flight so it can’t overlap) ====== */
+let _reloading = false;
+async function reload(){
+  if(_reloading) return;
+  _reloading = true;
+  try {
+    setStatus('Loading…');
+    const { items: pageItems, count } = await fetchResources();
+    items = pageItems; totalCount = count;
+    refreshTagCacheFrom(items);
+    render();
+  } catch(e){
+    console.error('[reload]', e);
+    setStatus('Network/Auth issue — see Console.', '#ff6b6b');
+  } finally {
+    _reloading = false;
+  }
 }
 
 /* ====== Events ====== */
@@ -292,13 +295,12 @@ function openModal(show){ els.modal.style.display = show ? 'grid' : 'none'; if (
 els.addBtn.onclick = ()=> openModal(true);
 els.cancel.onclick = ()=> openModal(false);
 
-// Debounced search → fetch new page from server
 els.q.oninput = debounce(e=>{ state.q=e.target.value.trim(); state.page=1; reload(); }, 220);
 els.cat.onchange = e=>{ state.cat=e.target.value; state.sub=''; state.page=1; reload(); };
 els.sub.onchange = e=>{ state.sub=e.target.value; state.page=1; reload(); };
 els.tag.onchange = e=>{ state.tag=e.target.value; state.page=1; reload(); };
 
-// Modal: suggestions for Courses
+// Modal: show course codes as suggestions if "Courses"
 els.catI.onchange = () => {
   if (els.catI.value === 'courses') {
     let dl = document.getElementById('subsOptions');
@@ -319,6 +321,7 @@ els.save.onclick = async () => {
   const subRaw=els.subI.value.trim();
   const tags=els.tagsI.value.split(',').map(s=>s.trim()).filter(Boolean);
   const description=els.descI.value.trim();
+
   if(!title || !url || !category) return alert('Please fill title, URL, and category.');
   if(!/^https?:\/\//i.test(url)) return alert('URL must start with http:// or https://');
   const subNorm = (category==='courses') ? subRaw.toUpperCase() : subRaw;
@@ -367,19 +370,16 @@ els.logoutBtn.onclick = async () => {
 };
 
 /* ====== Boot ====== */
-// Paint filters/chips immediately so it never looks "stuck"
+// paint UI immediately so it never looks empty
 setupFilters();
 render();
 
-await refreshAdminFlag().catch(console.warn);
+await refreshAdminFlag();
 toggleAuthButtons();
 await reload();
 
-// ensure cat select reflects state
+// ensure the <select> shows the current state
 els.cat.value = state.cat;
 
-// Feedback link safety
-if (els.feedbackLink) {
-  els.feedbackLink.target = '_blank';
-  els.feedbackLink.rel = 'noopener noreferrer';
-}
+// keep footer link safe (HTML already has real href)
+if (els.feedbackLink) { els.feedbackLink.target = '_blank'; els.feedbackLink.rel = 'noopener noreferrer'; }
