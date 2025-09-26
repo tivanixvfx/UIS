@@ -62,14 +62,12 @@ const els = {
   adminLogin: document.getElementById('adminLogin'),
   logoutBtn: document.getElementById('logoutBtn'),
 
-  // NEW: wire up the footer link so JS can access it if needed
+  // make the footer link addressable (even if you don't use it in JS)
   feedbackLink: document.getElementById('feedbackLink'),
 };
 
-
 // util: small debounce to reduce re-renders during typing
 function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
-
 
 /* ====== Data/Filters ====== */
 const CATS = [
@@ -88,6 +86,7 @@ const CATS = [
     'CHC2D','MHF4U','SCH3U','SCH4U','TGJ4M','CGW4U','HIF2O','OLC4O','MCV4U'
   ]},
 ];
+
 let items = [];
 let tagCache = [];
 const state = { q:'', cat:'all', sub:'', tag:'', page:1, pageSize:9 };
@@ -108,15 +107,18 @@ async function fetchResources(){
     .order('votes', { ascending:false })
     .order('title', { ascending:true });
   if (error) { console.error(error); return []; }
+
+  // Hide unapproved for non-admins
   return (data||[])
     .filter(r => isAdmin || r.approved === true)
     .map(r=>({
-    id:r.id, user_id:r.user_id || null, title:r.title, url:r.url,
-    category:r.category, sub:r.subcategory||'',
-    tags:r.tags||[], description:r.description||'',
-    votes:r.votes||0
-  }));
+      id:r.id, user_id:r.user_id || null, title:r.title, url:r.url,
+      category:r.category, sub:r.subcategory||'',
+      tags:r.tags||[], description:r.description||'',
+      votes:r.votes||0
+    }));
 }
+
 async function reload(){
   items = await fetchResources();
   const s = new Set(); items.forEach(r => (r.tags||[]).forEach(t => s.add(t)));
@@ -234,24 +236,41 @@ els.cat.onchange = e=>{ state.cat=e.target.value; state.sub=''; state.page=1; re
 els.sub.onchange = e=>{ state.sub=e.target.value; state.page=1; render(); };
 els.tag.onchange = e=>{ state.tag=e.target.value; state.page=1; render(); };
 
+// Modal category select (for "Courses" datalist suggestions on subI)
+els.catI.onchange = () => {
+  if (els.catI.value === 'courses') {
+    let dl = document.getElementById('subsOptions');
+    if (!dl) { dl = document.createElement('datalist'); dl.id='subsOptions'; document.body.appendChild(dl); }
+    const courseCat = CATS.find(c=>c.id==='courses');
+    dl.innerHTML = (courseCat?.subs||[]).map(s=>`<option value="${s}">`).join('');
+    els.subI.setAttribute('list','subsOptions');
+  } else {
+    els.subI.removeAttribute('list');
+  }
+};
+
 els.save.onclick = async () => {
   const title=els.titleI.value.trim();
   const url=els.urlI.value.trim();
   const category=els.catI.value;
-  const sub=els.subI.value.trim();
+  const subRaw=els.subI.value.trim();
   const tags=els.tagsI.value.split(',').map(s=>s.trim()).filter(Boolean);
   const description=els.descI.value.trim();
+
   if(!title || !url || !category) return alert('Please fill title, URL, and category.');
   if(!/^https?:\/\//i.test(url)) return alert('URL must start with http:// or https://');
-  const subNorm = (category==='courses') ? (els.subI.value.trim().toUpperCase()) : (els.subI.value.trim());
+
+  const subNorm = (category==='courses') ? subRaw.toUpperCase() : subRaw;
 
   const { error } = await supabase.from('resources').insert({
     user_id: session?.user?.id || null,
     title, url, category,
     subcategory: subNorm, tags, description
   });
-  if (error) return alert(error.message);
 
+  if (error) { console.error(error); return alert('Error saving: ' + error.message); }
+
+  // reset + refresh
   els.titleI.value = els.urlI.value = els.subI.value = els.tagsI.value = els.descI.value = '';
   openModal(false);
   await reload();
@@ -298,3 +317,10 @@ await refreshAdminFlag();
 toggleAuthButtons();
 await reload();
 els.cat.value = state.cat;
+
+// OPTIONAL: If you ever want to set/override the feedback link via JS
+// if (els.feedbackLink) {
+//   els.feedbackLink.href = 'https://docs.google.com/forms/d/YOUR_FORM_ID/viewform';
+//   els.feedbackLink.target = '_blank';
+//   els.feedbackLink.rel = 'noopener noreferrer';
+// }
