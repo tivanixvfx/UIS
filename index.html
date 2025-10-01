@@ -72,9 +72,32 @@
     </div>
   </div>
     <!-- Feedback Button: replace FORM_URL with your actual Google Form link -->
+    <!-- Onboarding Modal -->
+  <div class="modal" id="onboardModal" style="display:none">
+    <div class="sheet">
+      <h3>Welcome to the UIS Resource Hub 🎓</h3>
+      <p class="muted small">Quick overview of what you can do:</p>
+      <video id="onboardVideo" controls playsinline preload="metadata" style="width:100%;max-height:360px;border-radius:10px">
+        <source src="VIDEO_URL.mp4" type="video/mp4" />
+      </video>
+      <ul class="small">
+        <li>Search by title, tags, or URL</li>
+        <li>Filter by category / course code</li>
+        <li>Click “＋ Add resource” to submit helpful links</li>
+      </ul>
+      <div class="row justify-between">
+        <label class="small muted">
+          <input type="checkbox" id="onboardDontShow" /> Don’t show again
+        </label>
+        <div>
+          <button class="ghost" id="onboardClose">Close</button>
+          <button class="primary" id="onboardStart">Got it</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <!-- Footer section -->
-  <!-- Footer section -->
-    <!-- Footer section -->
   <footer class="site-footer">
     <div class="wrap footer-inner">
       <span>Built by students for <strong>UIS</strong></span>
