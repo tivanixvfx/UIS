@@ -51,6 +51,11 @@ const els = {
   pager: document.getElementById('pager'),
   empty: document.getElementById('empty'),
 
+  onboardModal: document.getElementById('onboardModal'),
+  onboardClose: document.getElementById('onboardClose'),
+  onboardStart: document.getElementById('onboardStart'),
+  onboardDontShow: document.getElementById('onboardDontShow'),
+
   modal: document.getElementById('modal'),
   addBtn: document.getElementById('addBtn'),
   titleI: document.getElementById('titleI'),
@@ -369,10 +374,38 @@ els.logoutBtn.onclick = async () => {
   await reload();
 };
 
+// ---- First-visit onboarding ----
+const ONBOARD_KEY = 'uis_onboard_seen';
+
+function openOnboard(show) {
+  if (!els.onboardModal) return;
+  els.onboardModal.style.display = show ? 'grid' : 'none';
+  if (!show) {
+    const v = document.getElementById('onboardVideo');
+    if (v) v.pause();
+  }
+}
+
+function showOnboardIfFirstVisit() {
+  if (!localStorage.getItem(ONBOARD_KEY)) openOnboard(true);
+}
+
+els.onboardClose?.addEventListener('click', () => {
+  if (els.onboardDontShow?.checked) localStorage.setItem(ONBOARD_KEY, '1');
+  openOnboard(false);
+});
+
+els.onboardStart?.addEventListener('click', () => {
+  localStorage.setItem(ONBOARD_KEY, '1');
+  openOnboard(false);
+});
+
+
 /* ====== Boot ====== */
 // paint UI immediately so it never looks empty
 setupFilters();
 render();
+showOnboardIfFirstVisit();
 
 await refreshAdminFlag();
 toggleAuthButtons();
