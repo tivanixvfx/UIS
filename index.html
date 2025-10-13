@@ -6,9 +6,8 @@
   <title>UIS Resource Hub</title>
 
   <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" type="image/png" href="./assets/Uis.png?v=2">
-  <link rel="apple-touch-icon" href="/assets/Uis.png" />
-
+  <link rel="icon" type="image/png" href="./assets/Uis.png?v=2" />
+  <link rel="apple-touch-icon" href="./assets/Uis.png" />
 
   <!-- Supabase client -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -25,12 +24,13 @@
 <body>
   <header class="wrap">
     <h1>UIS Resource Hub</h1>
-    <div class="sub">Find and share useful links for classes, tools, and campus life, in UIS.</div>
+    <div class="sub">Find and share useful links for classes, tools, and campus life in UIS.</div>
     <div class="row mt-12">
       <input id="q" type="text" placeholder="Search by title, tag, or URL…" />
       <select id="cat"></select>
       <select id="sub"></select>
       <select id="tag"></select>
+
       <button id="addBtn" class="primary">＋ Add resource</button>
 
       <!-- Admin-only auth controls -->
@@ -42,27 +42,40 @@
   <main class="wrap">
     <div class="pillbar" id="catChips"></div>
     <div id="count" class="muted small mtb-6-12"></div>
+
     <div id="empty" class="muted small" style="display:none;margin:10px 0;">
       No resources yet — be the first to submit!
     </div>
+
     <section class="grid" id="list"></section>
     <div class="pagination" id="pager"></div>
   </main>
 
-  <!-- Add Resource Modal (hidden by default) -->
+  <!-- Add Resource Modal -->
   <div class="modal" id="modal" style="display:none">
     <div class="sheet">
       <h3>Suggest a resource</h3>
+
       <div class="row">
         <input id="titleI" type="text" placeholder="Title (e.g., Khan Academy – Algebra)" class="flex-2" />
         <input id="urlI" type="url" placeholder="URL (https://…)" class="flex-2" />
       </div>
+
       <div class="row mt-8">
         <select id="catI"></select>
-        <input id="subI" type="text" placeholder="Subcategory (e.g., Algebra)" />
+        <input id="subI" type="text" placeholder="Subcategory (e.g., Algebra or ENG4U)" />
         <input id="tagsI" type="text" placeholder="Tags (comma separated)" />
       </div>
+
       <textarea id="descI" placeholder="Why is this helpful? Short description…"></textarea>
+
+      <!-- NEW: Guidelines consent -->
+      <label class="small" style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem">
+        <input type="checkbox" id="policyAgree" />
+        I confirm this submission follows the
+        <a href="#" id="openPolicy">School Resource Guidelines</a>.
+      </label>
+
       <div class="hr"></div>
       <div class="row justify-end">
         <button class="ghost" id="cancel">Cancel</button>
@@ -71,43 +84,36 @@
       <div class="small muted">Posts are public. Only admin can delete.</div>
     </div>
   </div>
-    <!-- Feedback Button: replace FORM_URL with your actual Google Form link -->
-    <!-- Onboarding Modal -->
-  <div class="modal" id="onboardModal" style="display:none">
+
+  <!-- School Resource Guidelines Modal (NEW) -->
+  <div class="modal" id="policyModal" style="display:none">
     <div class="sheet">
-      <h3>Welcome to the UIS Resource Hub 🎓</h3>
-      <p class="muted small">Quick overview of what you can do:</p>
-      <video id="onboardVideo" controls playsinline preload="metadata" style="width:100%;max-height:360px;border-radius:10px">
-        <source src="VIDEO_URL.mp4" type="video/mp4" />
-      </video>
-      <ul class="small">
-        <li>Search by title, tags, or URL</li>
-        <li>Filter by category / course code</li>
-        <li>Click “＋ Add resource” to submit helpful links</li>
-      </ul>
-      <div class="row justify-between">
-        <label class="small muted">
-          <input type="checkbox" id="onboardDontShow" /> Don’t show again
-        </label>
-        <div>
-          <button class="ghost" id="onboardClose">Close</button>
-          <button class="primary" id="onboardStart">Got it</button>
-        </div>
+      <h3>School Resource Guidelines</h3>
+      <ol class="small policy-list" style="margin:8px 0 12px; padding-left: 1.1rem;">
+        <li><strong>No materials from other schools</strong> (websites, branded YouTube channels, documents, slides) unless our administration has written permission.</li>
+        <li>Only share resources that are <strong>publicly available</strong> and do not violate <strong>copyright</strong> or license terms.</li>
+        <li><strong>No scans / uploads</strong> of textbooks, paid courseware, or paywalled content.</li>
+        <li>Content must be <strong>appropriate for school</strong> (no profanity, hate, harassment, or unsafe material).</li>
+        <li><strong>No personal or private information</strong> (yours or others’).</li>
+        <li>Submissions may be <strong>reviewed by staff</strong> and removed if they don’t meet these rules.</li>
+        <li>If you’re unsure, <strong>ask a teacher/counsellor</strong> before posting.</li>
+      </ol>
+      <div class="row justify-end">
+        <button class="ghost" id="policyClose">Close</button>
       </div>
     </div>
   </div>
-<!-- Footer section -->
+
+  <!-- Footer -->
   <footer class="site-footer">
     <div class="wrap footer-inner">
       <span>Built by students for <strong>UIS</strong></span>
       <span class="dot">•</span>
-      <a
-        href="https://forms.gle/dc1KK1rR9XMgVZ8G7"
-        target="_blank"
-        rel="noopener noreferrer"
-        id="feedbackLink"
-        class="link"
-      >Give feedback</a>
+      <a href="#" id="feedbackLink" class="link">Give feedback</a>
+      <span class="dot">•</span>
+      <a href="#" id="policyFooterLink" class="link">Guidelines</a>
+      <span class="dot">•</span>
+      <span class="muted small">Student-submitted; reviewed by staff.</span>
       <span class="dot">•</span>
       <span class="version">v1.0</span>
     </div>
