@@ -1,123 +1,54 @@
-/* Theme */
+/* ==== DARK THEME OVERRIDES (paste at the end of styles.css) ==== */
 :root {
-  --brand: #3459b6;
-  --muted: #777;
-  --bg: #f9f9fb;
-  --card: #fff;
-  --border: #ddd;
+  --brand: #4c6fff;        /* link/button blue like before */
+  --bg: #0b1220;           /* page background */
+  --card: #0f1629;         /* card background */
+  --border: #1e2a44;       /* subtle borders */
+  --muted: #9aa3b2;        /* secondary text */
 }
 
-* { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  background: var(--bg);
-  color: #1d2030;
-}
+/* page & text */
+body { background: var(--bg); color: #e6eaf2; }
 
-/* Layout */
-.wrap { max-width: 1000px; margin: 0 auto; padding: 1rem; }
-h1 { margin: 0; }
-.sub { color: var(--muted); margin-top: 0.3rem; }
-
-.row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
-.justify-end { justify-content: flex-end; }
-.mt-12 { margin-top: 12px; }
-.mt-8 { margin-top: 8px; }
-.mtb-6-12 { margin: 6px 0 12px; }
-
-/* Inputs & buttons */
+/* inputs */
 input, select, textarea, button {
-  padding: 0.6rem 0.65rem;
+  background: #0b1220;
+  color: #e6eaf2;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 14px;
-  background: #fff;
 }
-textarea { width: 100%; min-height: 100px; resize: vertical; }
+input::placeholder, textarea::placeholder { color: #7e8aa8; }
 
-button.primary {
-  background: var(--brand);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-}
-button.primary:hover { filter: brightness(1.05); }
-button.ghost {
-  background: transparent;
-  border: 1px solid var(--border);
-  cursor: pointer;
-}
-button.ghost:hover { background: #eef3ff; }
+/* buttons */
+button.primary { background: var(--brand); color: #fff; border: none; }
+button.primary:hover { filter: brightness(1.07); }
+button.ghost { background: transparent; color: #e6eaf2; border: 1px solid #2b3a5c; }
+button.ghost:hover { background: #0f1a31; }
 
-/* Chips & small text */
-.badge {
-  background: #eef1f8;
-  border-radius: 999px;
-  padding: 4px 10px;
-  margin: 2px;
-  display: inline-block;
-  cursor: pointer;
-}
-.muted { color: var(--muted); }
-.small { font-size: 0.92rem; }
+/* chips / badges */
+.badge { background: #1e293b; color: #cbd5e1; }
 
-/* Grid */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px,1fr));
-  gap: 1rem;
-}
+/* cards */
 .card {
   background: var(--card);
-  padding: 1rem;
-  border-radius: 14px;
-  box-shadow: 0 6px 18px rgba(33, 45, 80, 0.06);
+  border: 1px solid var(--border);
+  box-shadow: none;
 }
-.footer { margin-top: 0.8rem; }
 
-/* Links & footer */
-.link { color: var(--brand); text-decoration: none; }
+/* links */
+.link { color: var(--brand); }
 .link:hover { text-decoration: underline; }
 
-.site-footer { background: #f1f4f9; margin-top: 2rem; padding: 1rem 0; }
-.footer-inner { display: flex; justify-content: center; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.dot { color: #a8b0c2; }
+/* footer */
+.site-footer { background: #0b1220; }
+.footer-inner, .muted, .dot, .version { color: var(--muted); }
 
-/* Modal */
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 14, 25, 0.55);
-  display: grid;
-  place-items: center;
-  z-index: 1000;
-}
-.sheet {
-  background: white;
-  padding: 1rem;
-  border-radius: 14px;
-  width: 92%;
-  max-width: 720px;
-}
-.hr { height: 1px; background: var(--border); margin: 10px 0; }
+/* modals */
+.modal { background: rgba(7, 10, 20, 0.7); }
+.sheet { background: #101a31; border: 1px solid #233051; color: #e6eaf2; }
+.hr { background: #22314d; }
 
-/* Inline guidelines box */
+/* inline policy box */
 .policy-inline {
-  margin-top: 10px;
-  padding: 10px;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-  background: #f7f9ff;
-}
-.policy-inline .policy-list li { margin: 4px 0; }
-
-/* Guidelines modal tweaks */
-.policy-list li { margin: 4px 0; }
-#policyModal .sheet { max-width: 640px; }
-
-/* Responsive */
-@media (max-width: 480px) {
-  .sheet { width: 94vw; }
+  background: #0f1a31;
+  border-color: #233051;
 }
