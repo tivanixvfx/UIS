@@ -1,10 +1,10 @@
 /* Theme */
 :root {
   --brand: #3459b6;
-  --muted: #6f7483;
-  --bg: #f8f9fb;
+  --muted: #777;
+  --bg: #f9f9fb;
   --card: #fff;
-  --border: #e2e6ef;
+  --border: #ddd;
 }
 
 * { box-sizing: border-box; }
