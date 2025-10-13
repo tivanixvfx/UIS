@@ -1,11 +1,11 @@
 /* =========================
-   UIS Resource Hub — app.js (with Guidelines enforcement)
+   UIS Resource Hub — app.js (fresh & stable)
    ========================= */
 
-/* ====== Supabase Client ====== */
+/* ---- Supabase client ---- */
 const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON);
 
-/* ====== Session safety (prevents Chrome hanging forever) ====== */
+/* ---- Safe session getter (avoid hangs) ---- */
 async function getSessionSafe(ms = 3500) {
   try {
     return await Promise.race([
@@ -16,19 +16,18 @@ async function getSessionSafe(ms = 3500) {
     return { data: { session: null } };
   }
 }
-
 let session = (await getSessionSafe()).data.session || null;
 let isAdmin = false;
 
-/* ====== Auth state ====== */
+/* ---- Auth state listener ---- */
 supabase.auth.onAuthStateChange(async (_evt, s) => {
   session = s;
-  await refreshAdminFlag();
+  await refreshAdminFlag().catch(console.warn);
   toggleAuthButtons();
   await reload();
 });
 
-/* ====== Elements ====== */
+/* ---- Elements ---- */
 const els = {
   q: document.getElementById('q'),
   cat: document.getElementById('cat'),
@@ -54,22 +53,21 @@ const els = {
   adminLogin: document.getElementById('adminLogin'),
   logoutBtn: document.getElementById('logoutBtn'),
 
-  feedbackLink: document.getElementById('feedbackLink'),
-
-  // NEW: Policy elements
+  // Policies
   policyModal: document.getElementById('policyModal'),
   policyClose: document.getElementById('policyClose'),
-  openPolicy: document.getElementById('openPolicy'),
   policyFooterLink: document.getElementById('policyFooterLink'),
-  policyAgree: document.getElementById('policyAgree'),
+
+  // Footer
+  feedbackLink: document.getElementById('feedbackLink'),
 };
 
-/* ====== Utils ====== */
+/* ---- Utils ---- */
 function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 function fillSelect(sel, opts){ sel.innerHTML=''; opts.forEach(o=> sel.append(new Option(o.label,o.value))); }
 function labelOf(id){ return (CATS.find(c=>c.id===id)||{}).name || id; }
 
-/* ====== Categories (with your course codes) ====== */
+/* ---- Categories ---- */
 const CATS = [
   { id:'all', name:'All', subs:[] },
   { id:'admin', name:'School Admin', subs:['Calendar','Clubs','Counseling'] },
@@ -85,20 +83,17 @@ const CATS = [
   ]},
 ];
 
-/* ====== State & caches ====== */
+/* ---- State & caches ---- */
 const state = { q:'', cat:'all', sub:'', tag:'', page:1, pageSize:9 };
 let items = [];
 let tagCache = [];
 
-/* ====== Admin helpers ====== */
+/* ---- Admin helpers ---- */
 async function refreshAdminFlag(){
-  if (!session) { isAdmin = false; return; }
+  if (!session) { isAdmin=false; return; }
   const { data, error } = await supabase
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', session.user.id)
-    .single();
-  if (error) { console.warn(error); isAdmin = false; return; }
+    .from('profiles').select('is_admin').eq('id', session.user.id).single();
+  if (error) { console.warn(error); isAdmin=false; return; }
   isAdmin = !!data?.is_admin;
 }
 async function ensureProfile(){
@@ -107,13 +102,9 @@ async function ensureProfile(){
   const { data, error } = await supabase
     .from('profiles').select('id').eq('id', user.id).single();
   if (error && error.code !== 'PGRST116') console.warn(error);
-  if (!data) {
-    await supabase.from('profiles').insert({
-      id: user.id,
-      full_name: user.user_metadata?.name || '',
-      email: user.email
-    });
-  }
+  if (!data) await supabase.from('profiles').insert({
+    id: user.id, full_name: user.user_metadata?.name || '', email: user.email
+  });
 }
 function toggleAuthButtons(){
   const logged = !!session;
@@ -121,7 +112,7 @@ function toggleAuthButtons(){
   els.logoutBtn.style.display  = logged ? '' : 'none';
 }
 
-/* ====== Setup filters ====== */
+/* ---- Filters ---- */
 function setupFilters(){
   fillSelect(els.cat, CATS.map(c=>({label:c.name, value:c.id})));
   fillSelect(els.sub, [{label:'Any subcategory', value:''}]);
@@ -129,9 +120,8 @@ function setupFilters(){
   fillSelect(els.catI, CATS.filter(c=>c.id!=='all').map(c=>({label:c.name, value:c.id})));
 }
 
-/* ====== DB fetch (simple + robust) ====== */
+/* ---- Fetch ---- */
 async function fetchResources(){
-  // Pull all (ordered); RLS hides unapproved for non-admins if your policies enforce that
   const { data, error } = await supabase
     .from('resources')
     .select('id,user_id,title,url,category,subcategory,tags,description,votes,approved,created_at')
@@ -139,7 +129,7 @@ async function fetchResources(){
     .order('title', { ascending:true });
   if (error) { console.error(error); return []; }
 
-  const list = (data||[])
+  return (data||[])
     .filter(r => isAdmin || r.approved === true)
     .map(r => ({
       id:r.id, user_id:r.user_id || null, title:r.title, url:r.url,
@@ -147,10 +137,9 @@ async function fetchResources(){
       tags:r.tags||[], description:r.description||'',
       votes:r.votes||0
     }));
-  return list;
 }
 
-/* ====== Render helpers ====== */
+/* ---- Render helpers ---- */
 function computeTags(){ return tagCache; }
 function filtered(){
   let list=[...items];
@@ -170,7 +159,7 @@ function filtered(){
   return list;
 }
 
-/* ====== Render ====== */
+/* ---- Render ---- */
 function render(){
   toggleAuthButtons();
 
@@ -206,7 +195,7 @@ function render(){
     const title=document.createElement('a'); title.href=r.url; title.target='_blank'; title.rel='noopener'; title.className='link'; title.textContent=r.title;
     top.append(title);
 
-    // admin-only delete button (UI)
+    // admin-only delete button (UI; DB RLS should also enforce)
     if(isAdmin){
       const del=document.createElement('button'); del.className='ghost'; del.textContent='Delete';
       del.onclick=async()=>{ if(!confirm('Delete this resource?'))return;
@@ -250,7 +239,7 @@ function render(){
   }
 }
 
-/* ====== Reload ====== */
+/* ---- Reload ---- */
 async function reload(){
   items = await fetchResources();
   const s = new Set(); items.forEach(r => (r.tags||[]).forEach(t => s.add(t)));
@@ -258,16 +247,17 @@ async function reload(){
   render();
 }
 
-/* ====== Events ====== */
+/* ---- Events ---- */
 function openModal(show){ els.modal.style.display = show ? 'grid' : 'none'; if (show) setTimeout(()=> els.titleI?.focus(),0); }
 els.addBtn.onclick = ()=> openModal(true);
 els.cancel.onclick = ()=> openModal(false);
+
 els.q.oninput = debounce(e=>{ state.q=e.target.value; state.page=1; render(); }, 150);
 els.cat.onchange = e=>{ state.cat=e.target.value; state.sub=''; state.page=1; render(); };
 els.sub.onchange = e=>{ state.sub=e.target.value; state.page=1; render(); };
 els.tag.onchange = e=>{ state.tag=e.target.value; state.page=1; render(); };
 
-/* ====== Save (with policy enforcement) ====== */
+/* ---- Save (with required policy agreement) ---- */
 els.save.onclick = async () => {
   const title=els.titleI.value.trim();
   const url=els.urlI.value.trim();
@@ -279,10 +269,9 @@ els.save.onclick = async () => {
   if(!title || !url || !category) return alert('Please fill title, URL, and category.');
   if(!/^https?:\/\//i.test(url)) return alert('URL must start with http:// or https://');
 
-  // NEW: enforce policy agreement
-  if (!els.policyAgree?.checked) {
-    return alert('Please confirm your submission follows the School Resource Guidelines.');
-  }
+  // enforce agreement
+  const agree = /** inline checkbox element */ document.getElementById('policyAgree');
+  if (!agree?.checked) return alert('Please confirm your submission follows the School Resource Guidelines.');
 
   const subNorm = (category==='courses') ? subRaw.toUpperCase() : subRaw;
 
@@ -294,26 +283,23 @@ els.save.onclick = async () => {
   if (error) return alert(error.message);
 
   els.titleI.value = els.urlI.value = els.subI.value = els.tagsI.value = els.descI.value = '';
-  els.policyAgree.checked = false;
+  agree.checked = false;
   openModal(false);
   await reload();
 };
 
-/* ====== Policy modal wiring ====== */
+/* ---- Policy modal (footer link) ---- */
 function openPolicy(show){ if (!els.policyModal) return; els.policyModal.style.display = show ? 'grid' : 'none'; }
-els.openPolicy?.addEventListener('click', (e)=>{ e.preventDefault(); openPolicy(true); });
 els.policyFooterLink?.addEventListener('click', (e)=>{ e.preventDefault(); openPolicy(true); });
 els.policyClose?.addEventListener('click', ()=> openPolicy(false));
 
-/* ====== Admin auth (email/password) ====== */
+/* ---- Admin auth ---- */
 els.adminLogin.onclick = async () => {
   const email = prompt('Admin email:'); if (!email) return;
   const password = prompt('Admin password:'); if (!password) return;
 
-  // Try sign-in first
-  let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  let { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error && error.status === 400) {
-    // If not existing, create account (then set is_admin=true in Table Editor)
     const up = await supabase.auth.signUp({ email, password });
     if (up.error) return alert("Sign-up failed: " + up.error.message);
     alert('Account created. In Supabase → Table Editor → profiles, set is_admin=true on your row, then sign in again.');
@@ -326,7 +312,6 @@ els.adminLogin.onclick = async () => {
   toggleAuthButtons();
   await reload();
 };
-
 els.logoutBtn.onclick = async () => {
   await supabase.auth.signOut();
   isAdmin = false;
@@ -334,13 +319,13 @@ els.logoutBtn.onclick = async () => {
   await reload();
 };
 
-/* ====== Boot ====== */
+/* ---- Boot ---- */
 setupFilters();
-await refreshAdminFlag();
+await refreshAdminFlag().catch(console.warn);
 toggleAuthButtons();
 await reload();
 
-// Feedback link → your Google Form
+// Footer → Feedback link (use your real form link)
 els.feedbackLink?.addEventListener('click', (e) => {
   e.preventDefault();
   window.open('https://docs.google.com/forms/d/e/1FAIpQLSe-pZFxPiXsyy53qCLOuN82-9gplif_TpVXt_VF877b2G9W3w/viewform?usp=sharing&ouid=107599033470817781782', '_blank', 'noopener');
