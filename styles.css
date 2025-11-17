@@ -62,6 +62,13 @@ button.ghost:hover{background:#0f1a31}
   display:inline-block; cursor:pointer;
 }
 
+/* “New” badge */
+.badge-new{
+  background:#16a34a;
+  color:#e5fbe9;
+  font-size:.75rem;
+}
+
 /* Small text */
 .small{font-size:.92rem}
 .muted{color:var(--muted)}
@@ -79,7 +86,15 @@ button.ghost:hover{background:#0f1a31}
   padding:1rem;
   border-radius:14px;
 }
-.footer{margin-top:.8rem}
+
+/* Card footer — open link + name */
+.footer{
+  margin-top:.8rem;
+  display:flex;
+  align-items:center;
+  gap:.6rem;
+  flex-wrap:wrap;
+}
 
 /* Footer */
 .site-footer{
