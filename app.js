@@ -68,7 +68,6 @@ const els = {
   q: document.getElementById('q'),
   cat: document.getElementById('cat'),
   sub: document.getElementById('sub'),
-  tag: document.getElementById('tag'),
   list: document.getElementById('list'),
   count: document.getElementById('count'),
   chips: document.getElementById('catChips'),
@@ -80,7 +79,7 @@ const els = {
   titleI: document.getElementById('titleI'),
   urlI: document.getElementById('urlI'),
   courseI: document.getElementById('courseI'),
-  tagsI: document.getElementById('tagsI'),
+  nameI: document.getElementById('nameI'),
   descI: document.getElementById('descI'),
   save: document.getElementById('save'),
   cancel: document.getElementById('cancel'),
@@ -116,19 +115,25 @@ function subjectLabel(id) {
   return 'Other';
 }
 
+function isNewResource(r) {
+  if (!r.created_at) return false;
+  const created = new Date(r.created_at).getTime();
+  const now = Date.now();
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  return (now - created) <= sevenDays;
+}
+
 /* ===== State ===== */
 
 const state = {
   q: '',
   cat: 'all',   // subject id, or 'all'
   sub: '',      // course code
-  tag: '',
   page: 1,
   pageSize: 9,
 };
 
 let items = [];
-let tagCache = [];
 
 /* ===== Admin helpers ===== */
 
@@ -189,9 +194,6 @@ function setupFilters() {
     ...COURSE_CODES.map(c => ({ label: c, value: c })),
   ]);
 
-  // Tags filter initial
-  fillSelect(els.tag, [{ label: 'Any tag', value: '' }]);
-
   // Course dropdown in modal (posting)
   fillSelect(els.courseI, [
     { label: 'Select course', value: '' },
@@ -204,7 +206,7 @@ function setupFilters() {
 async function fetchResources() {
   const { data, error } = await supabase
     .from('resources')
-    .select('id,user_id,title,url,category,subcategory,tags,description,votes,approved,created_at')
+    .select('id,user_id,title,url,category,subcategory,student_name,description,votes,approved,created_at')
     .order('votes', { ascending: false })
     .order('title', { ascending: true });
 
@@ -222,17 +224,14 @@ async function fetchResources() {
       url: r.url,
       category: r.category,          // subject id
       sub: r.subcategory || '',      // course code
-      tags: r.tags || [],
+      name: r.student_name || '',
       description: r.description || '',
       votes: r.votes || 0,
+      created_at: r.created_at || null,
     }));
 }
 
 /* ===== Filter / render helpers ===== */
-
-function computeTags() {
-  return tagCache;
-}
 
 function filtered() {
   let list = [...items];
@@ -247,18 +246,13 @@ function filtered() {
     list = list.filter(r => r.sub === state.sub);
   }
 
-  // tag filter
-  if (state.tag) {
-    list = list.filter(r => (r.tags || []).includes(state.tag));
-  }
-
   // search
   if (state.q) {
     const q = state.q.toLowerCase();
     list = list.filter(r =>
       r.title.toLowerCase().includes(q) ||
       r.description.toLowerCase().includes(q) ||
-      (r.tags || []).some(t => t.toLowerCase().includes(q)) ||
+      r.sub.toLowerCase().includes(q) ||
       r.url.toLowerCase().includes(q)
     );
   }
@@ -286,13 +280,6 @@ function render() {
     ...courseOptions.map(c => ({ label: c, value: c })),
   ]);
   els.sub.value = state.sub;
-
-  // Tags dropdown
-  fillSelect(els.tag, [
-    { label: 'Any tag', value: '' },
-    ...computeTags().map(t => ({ label: '#' + t, value: t })),
-  ]);
-  els.tag.value = state.tag;
 
   // Subject chips
   els.chips.innerHTML = '';
@@ -335,6 +322,15 @@ function render() {
     title.textContent = r.title;
     top.append(title);
 
+    // New badge if within 7 days
+    if (isNewResource(r)) {
+      const newBadge = document.createElement('span');
+      newBadge.className = 'badge badge-new small';
+      newBadge.style.marginLeft = '6px';
+      newBadge.textContent = 'New';
+      top.append(newBadge);
+    }
+
     // Admin delete button
     if (isAdmin) {
       const del = document.createElement('button');
@@ -362,23 +358,9 @@ function render() {
       card.append(d);
     }
 
-    if (r.tags?.length) {
-      const tagWrap = document.createElement('div');
-      r.tags.forEach(t => {
-        const chip = document.createElement('span');
-        chip.className = 'badge';
-        chip.textContent = '#' + t;
-        chip.onclick = () => {
-          state.tag = t;
-          render();
-        };
-        tagWrap.append(chip);
-      });
-      card.append(tagWrap);
-    }
-
     const foot = document.createElement('div');
     foot.className = 'footer';
+
     const open = document.createElement('a');
     open.href = r.url;
     open.target = '_blank';
@@ -386,6 +368,14 @@ function render() {
     open.className = 'badge';
     open.textContent = 'Open link ↗';
     foot.append(open);
+
+    if (r.name) {
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'muted small';
+      nameSpan.textContent = r.name;
+      foot.append(nameSpan);
+    }
+
     card.append(foot);
 
     els.list.append(card);
@@ -421,9 +411,6 @@ function render() {
 
 async function reload() {
   items = await fetchResources();
-  const s = new Set();
-  items.forEach(r => (r.tags || []).forEach(t => s.add(t)));
-  tagCache = Array.from(s).sort();
   render();
 }
 
@@ -458,19 +445,13 @@ els.sub.onchange = e => {
   render();
 };
 
-els.tag.onchange = e => {
-  state.tag = e.target.value;
-  state.page = 1;
-  render();
-};
-
 /* ===== Save new resource ===== */
 
 els.save.onclick = async () => {
   const title = els.titleI.value.trim();
   const url = els.urlI.value.trim();
   const course = els.courseI.value;
-  const tags = els.tagsI.value.split(',').map(s => s.trim()).filter(Boolean);
+  const name = els.nameI.value.trim();
   const description = els.descI.value.trim();
 
   if (!title || !url || !course) {
@@ -493,7 +474,7 @@ els.save.onclick = async () => {
     url,
     category,          // subject id
     subcategory: course,
-    tags,
+    student_name: name || null,
     description,
   });
 
@@ -504,7 +485,7 @@ els.save.onclick = async () => {
   // Reset form
   els.titleI.value = '';
   els.urlI.value = '';
-  els.tagsI.value = '';
+  els.nameI.value = '';
   els.descI.value = '';
   els.courseI.value = '';
   agree.checked = false;
