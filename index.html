@@ -5,19 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>UIS Resource Hub</title>
 
-  <link rel="stylesheet" href="styles.css?v=3" />
-  <link rel="icon" type="image/png" href="./assets/Uis.png?v=2" />
+  <link rel="icon" type="image/png" href="./assets/Uis.png" />
   <link rel="apple-touch-icon" href="./assets/Uis.png" />
+  <link rel="stylesheet" href="styles.css" />
 
   <!-- Supabase client -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script>
-    /* replace with YOUR values if you recreate Supabase */
-    window.SUPABASE_URL  = "https://cacfbgxkohkxexduzgxc.supabase.co";
-    window.SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhY2ZiZ3hrb2hreGV4ZHV6Z3hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzOTU4MjksImV4cCI6MjA3Mzk3MTgyOX0.-f2Hy2ZPexkD3mWbKAC1hti5pyGOd2HmfGFfDissqoc";
-  </script>
-
-  <!-- Use module so top-level await in app.js works -->
+  <!-- Our app logic -->
   <script type="module" src="app.js"></script>
 </head>
 
@@ -25,11 +19,14 @@
   <!-- Header -->
   <header class="wrap">
     <h1>UIS Resource Hub</h1>
-    <div class="sub">Find and share useful links for classes, tools, and campus life in UIS.</div>
+    <div class="sub">Find and share useful links for UIS courses.</div>
     <div class="row mt-12">
       <input id="q" type="text" placeholder="Search by title, tag, or URL…" />
+      <!-- subject filter -->
       <select id="cat"></select>
+      <!-- course filter -->
       <select id="sub"></select>
+      <!-- tags filter -->
       <select id="tag"></select>
 
       <button id="addBtn" class="primary">＋ Add resource</button>
@@ -42,7 +39,9 @@
 
   <!-- Main -->
   <main class="wrap">
+    <!-- subject chips -->
     <div class="pillbar" id="catChips"></div>
+
     <div id="count" class="muted small mtb-6-12"></div>
 
     <div id="empty" class="muted small" style="display:none;margin:10px 0;">
@@ -64,28 +63,28 @@
       </div>
 
       <div class="row mt-8">
-        <select id="catI"></select>
-        <input id="subI" type="text" placeholder="Subcategory (e.g., Algebra or ENG4U)" />
+        <!-- ONLY courses, no category field -->
+        <select id="courseI"></select>
         <input id="tagsI" type="text" placeholder="Tags (comma separated)" />
       </div>
 
       <textarea id="descI" placeholder="Why is this helpful? Short description…"></textarea>
 
-      <!-- ALWAYS-VISIBLE GUIDELINES (inline) -->
+      <!-- Inline guidelines -->
       <div class="policy-inline">
         <h4 class="small" style="margin:0 0 6px">School Resource Guidelines</h4>
         <ol class="small policy-list" style="margin:0; padding-left:1.1rem;">
-          <li><strong>No materials from other schools</strong> (websites, branded YouTube channels, documents, slides) unless our administration has written permission.</li>
-          <li>Only share resources that are <strong>publicly available</strong> and do not violate <strong>copyright</strong> or license terms.</li>
+          <li><strong>No materials from other schools</strong> unless our administration has written permission.</li>
+          <li>Only share resources that are <strong>publicly available</strong> and do not violate copyright.</li>
           <li><strong>No scans / uploads</strong> of textbooks, paid courseware, or paywalled content.</li>
-          <li>Content must be <strong>appropriate for school</strong> (no profanity, hate, harassment, or unsafe material).</li>
-          <li><strong>No personal or private information</strong> (yours or others’).</li>
-          <li>Submissions may be <strong>reviewed by staff</strong> and removed if they don’t meet these rules.</li>
-          <li>If you’re unsure, <strong>email</strong> <a href="mailto:hajilootivan8@gmail.com">hajilootivan8@gmail.com</a>.</li>
+          <li>Content must be <strong>appropriate for school</strong>.</li>
+          <li><strong>No personal or private information</strong>.</li>
+          <li>Submissions may be <strong>reviewed by staff</strong> and removed if needed.</li>
+          <li>If you’re unsure, email <a href="mailto:hajilootivan8@gmail.com">hajilootivan8@gmail.com</a>.</li>
         </ol>
       </div>
 
-      <!-- Consent checkbox (required to save) -->
+      <!-- Required checkbox -->
       <label class="small" style="display:flex;align-items:center;gap:.5rem;margin-top:.6rem">
         <input type="checkbox" id="policyAgree" />
         I confirm this submission follows the School Resource Guidelines.
@@ -100,18 +99,18 @@
     </div>
   </div>
 
-  <!-- School Resource Guidelines Modal (linked from footer) -->
+  <!-- Policy Modal (from footer link) -->
   <div class="modal" id="policyModal" style="display:none">
     <div class="sheet">
       <h3>School Resource Guidelines</h3>
       <ol class="small policy-list" style="margin:8px 0 12px; padding-left:1.1rem;">
-        <li><strong>No materials from other schools</strong> (websites, branded YouTube channels, documents, slides) unless our administration has written permission.</li>
-        <li>Only share resources that are <strong>publicly available</strong> and do not violate <strong>copyright</strong> or license terms.</li>
+        <li><strong>No materials from other schools</strong> unless our administration has written permission.</li>
+        <li>Only share resources that are <strong>publicly available</strong> and do not violate copyright.</li>
         <li><strong>No scans / uploads</strong> of textbooks, paid courseware, or paywalled content.</li>
-        <li>Content must be <strong>appropriate for school</strong> (no profanity, hate, harassment, or unsafe material).</li>
-        <li><strong>No personal or private information</strong> (yours or others’).</li>
-        <li>Submissions may be <strong>reviewed by staff</strong> and removed if they don’t meet these rules.</li>
-        <li>If you’re unsure, <strong>email</strong> <a href="mailto:hajilootivan8@gmail.com">hajilootivan8@gmail.com</a>.</li>
+        <li>Content must be <strong>appropriate for school</strong>.</li>
+        <li><strong>No personal or private information</strong>.</li>
+        <li>Submissions may be <strong>reviewed by staff</strong> and removed if needed.</li>
+        <li>If you’re unsure, email <a href="mailto:hajilootivan8@gmail.com">hajilootivan8@gmail.com</a>.</li>
       </ol>
       <div class="row justify-end">
         <button class="ghost" id="policyClose">Close</button>
@@ -130,7 +129,7 @@
       <span class="dot">•</span>
       <span class="muted small">Student-submitted; reviewed by staff.</span>
       <span class="dot">•</span>
-      <span class="version">v1.0</span>
+      <span class="version">v1.2</span>
     </div>
   </footer>
 </body>
