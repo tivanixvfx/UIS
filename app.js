@@ -1,25 +1,60 @@
 /* =========================
-   UIS Resource Hub — app.js (fresh & stable)
+   UIS Resource Hub — app.js
    ========================= */
 
-/* ---- Supabase client ---- */
-const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON);
+const SUPABASE_URL  = "https://cacfbgxkohkxexduzgxc.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhY2ZiZ3hrb2hreGV4ZHV6Z3hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzOTU4MjksImV4cCI6MjA3Mzk3MTgyOX0.-f2Hy2ZPexkD3mWbKAC1hti5pyGOd2HmfGFfDissqoc";
 
-/* ---- Safe session getter (avoid hangs) ---- */
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+/* ===== SUBJECT + COURSE MAPPING ===== */
+
+const SUBJECTS = [
+  { id:'esl',        name:'ESL',             codes:['ESLBO','ESLCO','ESLDO','ESLEO'] },
+  { id:'english',    name:'English',         codes:['ENG2D','ENG3U','ENG4U','OLC4O'] },
+  { id:'geography',  name:'Geography',       codes:['CGC1W','CGW4U'] },
+  { id:'math',       name:'Math',            codes:['MPM2D','MCR3U','MHF4U','MCV4U'] },
+  { id:'physics',    name:'Physics',         codes:['SPH3U'] },
+  { id:'biology',    name:'Biology',         codes:['SBI4U'] },
+  { id:'chemistry',  name:'Chemistry',       codes:['SCH3U','SCH4U'] },
+  { id:'science',    name:'Science',         codes:['SNC1W','SNC2D'] },
+  { id:'art',        name:'Visual Arts',     codes:['AWQ3M','AWQ4M'] },
+  { id:'business',   name:'Business',        codes:['BBB4M'] },
+  { id:'physed',     name:'Phys Ed',         codes:['PPL2O'] },
+  { id:'history',    name:'History',         codes:['CHC2D'] },
+  { id:'tech',       name:'Tech',            codes:['TGJ4M'] },
+  { id:'social',     name:'Social Science',  codes:['HIF2O'] },
+];
+
+const COURSE_CODES = SUBJECTS.flatMap(s => s.codes);
+
+const CODE_TO_SUBJECT = {};
+SUBJECTS.forEach(s => s.codes.forEach(code => {
+  CODE_TO_SUBJECT[code] = s.id;
+}));
+
+// For the chip bar
+const SUBJECT_CHIPS = [
+  { id:'all', name:'All' },
+  ...SUBJECTS
+];
+
+/* ===== Auth helpers ===== */
+
 async function getSessionSafe(ms = 3500) {
   try {
     return await Promise.race([
       supabase.auth.getSession(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('Session timeout')), ms)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)),
     ]);
   } catch {
     return { data: { session: null } };
   }
 }
+
 let session = (await getSessionSafe()).data.session || null;
 let isAdmin = false;
 
-/* ---- Auth state listener ---- */
 supabase.auth.onAuthStateChange(async (_evt, s) => {
   session = s;
   await refreshAdminFlag().catch(console.warn);
@@ -27,7 +62,8 @@ supabase.auth.onAuthStateChange(async (_evt, s) => {
   await reload();
 });
 
-/* ---- Elements ---- */
+/* ===== DOM refs ===== */
+
 const els = {
   q: document.getElementById('q'),
   cat: document.getElementById('cat'),
@@ -43,8 +79,7 @@ const els = {
   addBtn: document.getElementById('addBtn'),
   titleI: document.getElementById('titleI'),
   urlI: document.getElementById('urlI'),
-  catI: document.getElementById('catI'),
-  subI: document.getElementById('subI'),
+  courseI: document.getElementById('courseI'),
   tagsI: document.getElementById('tagsI'),
   descI: document.getElementById('descI'),
   save: document.getElementById('save'),
@@ -53,265 +88,467 @@ const els = {
   adminLogin: document.getElementById('adminLogin'),
   logoutBtn: document.getElementById('logoutBtn'),
 
-  // Policies
   policyModal: document.getElementById('policyModal'),
   policyClose: document.getElementById('policyClose'),
   policyFooterLink: document.getElementById('policyFooterLink'),
 
-  // Footer
   feedbackLink: document.getElementById('feedbackLink'),
 };
 
-/* ---- Utils ---- */
-function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
-function fillSelect(sel, opts){ sel.innerHTML=''; opts.forEach(o=> sel.append(new Option(o.label,o.value))); }
-function labelOf(id){ return (CATS.find(c=>c.id===id)||{}).name || id; }
+/* ===== Utils ===== */
 
-/* ---- Categories ---- */
-const CATS = [
-  { id:'all', name:'All', subs:[] },
-  { id:'admin', name:'School Admin', subs:['Calendar','Clubs','Counseling'] },
-  { id:'math', name:'Math', subs:['Algebra','Calculus','Geometry'] },
-  { id:'science', name:'Science', subs:['Biology','Chemistry','Physics'] },
-  { id:'computing', name:'Computing', subs:['Web Dev','Python','AI'] },
-  { id:'writing', name:'Writing', subs:['Grammar','Essays','Citations'] },
-  { id:'wellness', name:'Wellness', subs:['Mental Health','Fitness','Nutrition'] },
-  { id:'courses', name:'Courses', subs:[
-    'ESLBO','ESLCO','ESLDO','ENG2D','ENG3U','ENG4U','CGC1W','MCR3U','SPH3U',
-    'SBI4U','AWQ3M','AWQ4M','BBB4M','ESLEO','SNC1W','SNC2D','MPM2D','PPL2O',
-    'CHC2D','MHF4U','SCH3U','SCH4U','TGJ4M','CGW4U','HIF2O','OLC4O','MCV4U'
-  ]},
-];
+function debounce(fn, ms) {
+  let t;
+  return (...a) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...a), ms);
+  };
+}
 
-/* ---- State & caches ---- */
-const state = { q:'', cat:'all', sub:'', tag:'', page:1, pageSize:9 };
+function fillSelect(sel, opts) {
+  sel.innerHTML = '';
+  opts.forEach(o => sel.append(new Option(o.label, o.value)));
+}
+
+function subjectLabel(id) {
+  const s = SUBJECTS.find(x => x.id === id);
+  if (s) return s.name;
+  return 'Other';
+}
+
+/* ===== State ===== */
+
+const state = {
+  q: '',
+  cat: 'all',   // subject id, or 'all'
+  sub: '',      // course code
+  tag: '',
+  page: 1,
+  pageSize: 9,
+};
+
 let items = [];
 let tagCache = [];
 
-/* ---- Admin helpers ---- */
-async function refreshAdminFlag(){
-  if (!session) { isAdmin=false; return; }
+/* ===== Admin helpers ===== */
+
+async function refreshAdminFlag() {
+  if (!session) {
+    isAdmin = false;
+    return;
+  }
   const { data, error } = await supabase
-    .from('profiles').select('is_admin').eq('id', session.user.id).single();
-  if (error) { console.warn(error); isAdmin=false; return; }
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', session.user.id)
+    .single();
+  if (error) {
+    console.warn(error);
+    isAdmin = false;
+    return;
+  }
   isAdmin = !!data?.is_admin;
 }
-async function ensureProfile(){
+
+async function ensureProfile() {
   if (!session) return;
   const { user } = session;
   const { data, error } = await supabase
-    .from('profiles').select('id').eq('id', user.id).single();
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
   if (error && error.code !== 'PGRST116') console.warn(error);
-  if (!data) await supabase.from('profiles').insert({
-    id: user.id, full_name: user.user_metadata?.name || '', email: user.email
-  });
+  if (!data) {
+    await supabase.from('profiles').insert({
+      id: user.id,
+      full_name: user.user_metadata?.name || '',
+      email: user.email,
+    });
+  }
 }
-function toggleAuthButtons(){
+
+function toggleAuthButtons() {
   const logged = !!session;
   els.adminLogin.style.display = logged ? 'none' : '';
-  els.logoutBtn.style.display  = logged ? '' : 'none';
+  els.logoutBtn.style.display = logged ? '' : 'none';
 }
 
-/* ---- Filters ---- */
-function setupFilters(){
-  fillSelect(els.cat, CATS.map(c=>({label:c.name, value:c.id})));
-  fillSelect(els.sub, [{label:'Any subcategory', value:''}]);
-  fillSelect(els.tag, [{label:'Any tag', value:''}]);
-  fillSelect(els.catI, CATS.filter(c=>c.id!=='all').map(c=>({label:c.name, value:c.id})));
+/* ===== Setup filters ===== */
+
+function setupFilters() {
+  // Subject dropdown (filter)
+  fillSelect(els.cat, [
+    { label: 'All subjects', value: 'all' },
+    ...SUBJECTS.map(s => ({ label: s.name, value: s.id })),
+  ]);
+
+  // Course dropdown (filter) – initial: all courses
+  fillSelect(els.sub, [
+    { label: 'Any course', value: '' },
+    ...COURSE_CODES.map(c => ({ label: c, value: c })),
+  ]);
+
+  // Tags filter initial
+  fillSelect(els.tag, [{ label: 'Any tag', value: '' }]);
+
+  // Course dropdown in modal (posting)
+  fillSelect(els.courseI, [
+    { label: 'Select course', value: '' },
+    ...COURSE_CODES.map(c => ({ label: c, value: c })),
+  ]);
 }
 
-/* ---- Fetch ---- */
-async function fetchResources(){
+/* ===== Fetch from Supabase ===== */
+
+async function fetchResources() {
   const { data, error } = await supabase
     .from('resources')
     .select('id,user_id,title,url,category,subcategory,tags,description,votes,approved,created_at')
-    .order('votes', { ascending:false })
-    .order('title', { ascending:true });
-  if (error) { console.error(error); return []; }
+    .order('votes', { ascending: false })
+    .order('title', { ascending: true });
 
-  return (data||[])
+  if (error) {
+    console.error(error);
+    return [];
+  }
+
+  return (data || [])
     .filter(r => isAdmin || r.approved === true)
     .map(r => ({
-      id:r.id, user_id:r.user_id || null, title:r.title, url:r.url,
-      category:r.category, sub:r.subcategory||'',
-      tags:r.tags||[], description:r.description||'',
-      votes:r.votes||0
+      id: r.id,
+      user_id: r.user_id || null,
+      title: r.title,
+      url: r.url,
+      category: r.category,          // subject id
+      sub: r.subcategory || '',      // course code
+      tags: r.tags || [],
+      description: r.description || '',
+      votes: r.votes || 0,
     }));
 }
 
-/* ---- Render helpers ---- */
-function computeTags(){ return tagCache; }
-function filtered(){
-  let list=[...items];
-  if(state.cat!=='all') list=list.filter(r=> r.category===state.cat);
-  if(state.sub) list=list.filter(r=> r.sub===state.sub);
-  if(state.tag) list=list.filter(r=> (r.tags||[]).includes(state.tag));
-  if(state.q){
-    const q=state.q.toLowerCase();
-    list=list.filter(r=>
+/* ===== Filter / render helpers ===== */
+
+function computeTags() {
+  return tagCache;
+}
+
+function filtered() {
+  let list = [...items];
+
+  // subject filter
+  if (state.cat !== 'all') {
+    list = list.filter(r => r.category === state.cat);
+  }
+
+  // course filter
+  if (state.sub) {
+    list = list.filter(r => r.sub === state.sub);
+  }
+
+  // tag filter
+  if (state.tag) {
+    list = list.filter(r => (r.tags || []).includes(state.tag));
+  }
+
+  // search
+  if (state.q) {
+    const q = state.q.toLowerCase();
+    list = list.filter(r =>
       r.title.toLowerCase().includes(q) ||
       r.description.toLowerCase().includes(q) ||
-      (r.tags||[]).some(t=> t.toLowerCase().includes(q)) ||
+      (r.tags || []).some(t => t.toLowerCase().includes(q)) ||
       r.url.toLowerCase().includes(q)
     );
   }
-  list.sort((a,b)=> (b.votes-a.votes) || a.title.localeCompare(b.title));
+
+  // sort: votes desc, then title
+  list.sort((a, b) => (b.votes - a.votes) || a.title.localeCompare(b.title));
   return list;
 }
 
-/* ---- Render ---- */
-function render(){
+/* ===== Render ===== */
+
+function render() {
   toggleAuthButtons();
 
-  // sub options per category
-  const catObj=CATS.find(c=> c.id===state.cat);
-  const subOpts=[{label:'Any subcategory',value:''}, ...(catObj?.subs||[]).map(s=>({label:s,value:s}))];
-  fillSelect(els.sub, subOpts); els.sub.value = state.sub;
+  // Update course dropdown (filter) based on selected subject
+  let courseOptions;
+  if (state.cat === 'all') {
+    courseOptions = COURSE_CODES;
+  } else {
+    const subj = SUBJECTS.find(s => s.id === state.cat);
+    courseOptions = subj ? subj.codes : [];
+  }
+  fillSelect(els.sub, [
+    { label: 'Any course', value: '' },
+    ...courseOptions.map(c => ({ label: c, value: c })),
+  ]);
+  els.sub.value = state.sub;
 
-  // tag options
-  fillSelect(els.tag, [{label:'Any tag',value:''}, ...computeTags().map(t=>({label:'#'+t,value:t}))]);
+  // Tags dropdown
+  fillSelect(els.tag, [
+    { label: 'Any tag', value: '' },
+    ...computeTags().map(t => ({ label: '#' + t, value: t })),
+  ]);
   els.tag.value = state.tag;
 
-  // chips
-  els.chips.innerHTML='';
-  CATS.forEach(c=>{
-    const b=document.createElement('button'); b.textContent=c.name; b.className='badge';
-    if(state.cat===c.id) b.style.outline='2px solid var(--brand)';
-    b.onclick=()=>{ state.cat=c.id; state.sub=''; state.page=1; els.cat.value=c.id; render(); };
+  // Subject chips
+  els.chips.innerHTML = '';
+  SUBJECT_CHIPS.forEach(c => {
+    const b = document.createElement('button');
+    b.textContent = c.name;
+    b.className = 'badge';
+    if (state.cat === c.id) {
+      b.style.outline = '2px solid var(--brand)';
+    }
+    b.onclick = () => {
+      state.cat = c.id;
+      state.sub = '';
+      state.page = 1;
+      els.cat.value = c.id;
+      render();
+    };
     els.chips.append(b);
   });
 
-  const list=filtered();
-  els.count.textContent = `${list.length} result${list.length!==1?'s':''} • sorted by votes`;
+  const list = filtered();
+  els.count.textContent = `${list.length} result${list.length !== 1 ? 's' : ''} • sorted by votes`;
   els.empty.style.display = list.length ? 'none' : '';
 
-  // cards
-  els.list.innerHTML='';
-  const start=(state.page-1)*state.pageSize;
-  list.slice(start,start+state.pageSize).forEach(r=>{
-    const card=document.createElement('article'); card.className='card';
+  // Cards
+  els.list.innerHTML = '';
+  const start = (state.page - 1) * state.pageSize;
+  list.slice(start, start + state.pageSize).forEach(r => {
+    const card = document.createElement('article');
+    card.className = 'card';
 
-    const top=document.createElement('div'); top.className='row';
-    const title=document.createElement('a'); title.href=r.url; title.target='_blank'; title.rel='noopener'; title.className='link'; title.textContent=r.title;
+    const top = document.createElement('div');
+    top.className = 'row';
+
+    const title = document.createElement('a');
+    title.href = r.url;
+    title.target = '_blank';
+    title.rel = 'noopener';
+    title.className = 'link';
+    title.textContent = r.title;
     top.append(title);
 
-    // admin-only delete button (UI; DB RLS should also enforce)
-    if(isAdmin){
-      const del=document.createElement('button'); del.className='ghost'; del.textContent='Delete';
-      del.onclick=async()=>{ if(!confirm('Delete this resource?'))return;
-        const { error }=await supabase.from('resources').delete().eq('id', r.id);
-        if(error) return alert(error.message);
+    // Admin delete button
+    if (isAdmin) {
+      const del = document.createElement('button');
+      del.className = 'ghost';
+      del.textContent = 'Delete';
+      del.onclick = async () => {
+        if (!confirm('Delete this resource?')) return;
+        const { error } = await supabase.from('resources').delete().eq('id', r.id);
+        if (error) return alert(error.message);
         await reload();
       };
       top.append(del);
     }
+
     card.append(top);
 
-    const meta=document.createElement('div'); meta.className='muted small';
-    meta.textContent=`${labelOf(r.category)}${r.sub ? ' • '+r.sub : ''}`;
+    const meta = document.createElement('div');
+    meta.className = 'muted small';
+    meta.textContent = `${subjectLabel(r.category)}${r.sub ? ' • ' + r.sub : ''}`;
     card.append(meta);
 
-    if(r.description){ const d=document.createElement('div'); d.textContent=r.description; card.append(d); }
+    if (r.description) {
+      const d = document.createElement('div');
+      d.textContent = r.description;
+      card.append(d);
+    }
 
-    if(r.tags?.length){
-      const tagWrap=document.createElement('div');
-      r.tags.forEach(t=>{ const chip=document.createElement('span'); chip.className='badge'; chip.textContent='#'+t; chip.onclick=()=>{ state.tag=t; render(); }; tagWrap.append(chip); });
+    if (r.tags?.length) {
+      const tagWrap = document.createElement('div');
+      r.tags.forEach(t => {
+        const chip = document.createElement('span');
+        chip.className = 'badge';
+        chip.textContent = '#' + t;
+        chip.onclick = () => {
+          state.tag = t;
+          render();
+        };
+        tagWrap.append(chip);
+      });
       card.append(tagWrap);
     }
 
-    const foot=document.createElement('div'); foot.className='footer';
-    const open=document.createElement('a'); open.href=r.url; open.target='_blank'; open.rel='noopener'; open.className='badge'; open.textContent='Open link ↗';
-    foot.append(open); card.append(foot);
+    const foot = document.createElement('div');
+    foot.className = 'footer';
+    const open = document.createElement('a');
+    open.href = r.url;
+    open.target = '_blank';
+    open.rel = 'noopener';
+    open.className = 'badge';
+    open.textContent = 'Open link ↗';
+    foot.append(open);
+    card.append(foot);
 
     els.list.append(card);
   });
 
-  // pager
-  const pages=Math.max(1, Math.ceil(list.length/state.pageSize));
-  els.pager.innerHTML='';
-  if(pages>1){
-    const prev=document.createElement('button'); prev.textContent='‹ Prev';
-    prev.onclick=()=>{ state.page=Math.max(1,state.page-1); render(); };
-    const info=document.createElement('span'); info.className='muted small'; info.textContent=`Page ${state.page} / ${pages}`;
-    const next=document.createElement('button'); next.textContent='Next ›';
-    next.onclick=()=>{ state.page=Math.min(pages,state.page+1); render(); };
-    els.pager.append(prev,info,next);
+  // Pagination
+  const pages = Math.max(1, Math.ceil(list.length / state.pageSize));
+  els.pager.innerHTML = '';
+  if (pages > 1) {
+    const prev = document.createElement('button');
+    prev.textContent = '‹ Prev';
+    prev.onclick = () => {
+      state.page = Math.max(1, state.page - 1);
+      render();
+    };
+
+    const info = document.createElement('span');
+    info.className = 'muted small';
+    info.textContent = `Page ${state.page} / ${pages}`;
+
+    const next = document.createElement('button');
+    next.textContent = 'Next ›';
+    next.onclick = () => {
+      state.page = Math.min(pages, state.page + 1);
+      render();
+    };
+
+    els.pager.append(prev, info, next);
   }
 }
 
-/* ---- Reload ---- */
-async function reload(){
+/* ===== Reload ===== */
+
+async function reload() {
   items = await fetchResources();
-  const s = new Set(); items.forEach(r => (r.tags||[]).forEach(t => s.add(t)));
+  const s = new Set();
+  items.forEach(r => (r.tags || []).forEach(t => s.add(t)));
   tagCache = Array.from(s).sort();
   render();
 }
 
-/* ---- Events ---- */
-function openModal(show){ els.modal.style.display = show ? 'grid' : 'none'; if (show) setTimeout(()=> els.titleI?.focus(),0); }
-els.addBtn.onclick = ()=> openModal(true);
-els.cancel.onclick = ()=> openModal(false);
+/* ===== Modal & events ===== */
 
-els.q.oninput = debounce(e=>{ state.q=e.target.value; state.page=1; render(); }, 150);
-els.cat.onchange = e=>{ state.cat=e.target.value; state.sub=''; state.page=1; render(); };
-els.sub.onchange = e=>{ state.sub=e.target.value; state.page=1; render(); };
-els.tag.onchange = e=>{ state.tag=e.target.value; state.page=1; render(); };
+function openModal(show) {
+  els.modal.style.display = show ? 'grid' : 'none';
+  if (show) {
+    setTimeout(() => els.titleI?.focus(), 0);
+  }
+}
 
-/* ---- Save (with required policy agreement) ---- */
+els.addBtn.onclick = () => openModal(true);
+els.cancel.onclick = () => openModal(false);
+
+els.q.oninput = debounce(e => {
+  state.q = e.target.value;
+  state.page = 1;
+  render();
+}, 150);
+
+els.cat.onchange = e => {
+  state.cat = e.target.value;
+  state.sub = '';
+  state.page = 1;
+  render();
+};
+
+els.sub.onchange = e => {
+  state.sub = e.target.value;
+  state.page = 1;
+  render();
+};
+
+els.tag.onchange = e => {
+  state.tag = e.target.value;
+  state.page = 1;
+  render();
+};
+
+/* ===== Save new resource ===== */
+
 els.save.onclick = async () => {
-  const title=els.titleI.value.trim();
-  const url=els.urlI.value.trim();
-  const category=els.catI.value;
-  const subRaw=els.subI.value.trim();
-  const tags=els.tagsI.value.split(',').map(s=>s.trim()).filter(Boolean);
-  const description=els.descI.value.trim();
+  const title = els.titleI.value.trim();
+  const url = els.urlI.value.trim();
+  const course = els.courseI.value;
+  const tags = els.tagsI.value.split(',').map(s => s.trim()).filter(Boolean);
+  const description = els.descI.value.trim();
 
-  if(!title || !url || !category) return alert('Please fill title, URL, and category.');
-  if(!/^https?:\/\//i.test(url)) return alert('URL must start with http:// or https://');
+  if (!title || !url || !course) {
+    return alert('Please fill title, URL, and course.');
+  }
+  if (!/^https?:\/\//i.test(url)) {
+    return alert('URL must start with http:// or https://');
+  }
 
-  // enforce agreement
-  const agree = /** inline checkbox element */ document.getElementById('policyAgree');
-  if (!agree?.checked) return alert('Please confirm your submission follows the School Resource Guidelines.');
+  const agree = document.getElementById('policyAgree');
+  if (!agree?.checked) {
+    return alert('Please confirm your submission follows the School Resource Guidelines.');
+  }
 
-  const subNorm = (category==='courses') ? subRaw.toUpperCase() : subRaw;
+  const category = CODE_TO_SUBJECT[course] || 'other';
 
   const { error } = await supabase.from('resources').insert({
     user_id: session?.user?.id || null,
-    title, url, category,
-    subcategory: subNorm, tags, description
+    title,
+    url,
+    category,          // subject id
+    subcategory: course,
+    tags,
+    description,
   });
-  if (error) return alert(error.message);
 
-  els.titleI.value = els.urlI.value = els.subI.value = els.tagsI.value = els.descI.value = '';
+  if (error) {
+    return alert(error.message);
+  }
+
+  // Reset form
+  els.titleI.value = '';
+  els.urlI.value = '';
+  els.tagsI.value = '';
+  els.descI.value = '';
+  els.courseI.value = '';
   agree.checked = false;
+
   openModal(false);
   await reload();
 };
 
-/* ---- Policy modal (footer link) ---- */
-function openPolicy(show){ if (!els.policyModal) return; els.policyModal.style.display = show ? 'grid' : 'none'; }
-els.policyFooterLink?.addEventListener('click', (e)=>{ e.preventDefault(); openPolicy(true); });
-els.policyClose?.addEventListener('click', ()=> openPolicy(false));
+/* ===== Policy modal ===== */
 
-/* ---- Admin auth ---- */
+function openPolicy(show) {
+  els.policyModal.style.display = show ? 'grid' : 'none';
+}
+
+els.policyFooterLink?.addEventListener('click', e => {
+  e.preventDefault();
+  openPolicy(true);
+});
+
+els.policyClose?.addEventListener('click', () => openPolicy(false));
+
+/* ===== Admin auth ===== */
+
 els.adminLogin.onclick = async () => {
-  const email = prompt('Admin email:'); if (!email) return;
-  const password = prompt('Admin password:'); if (!password) return;
+  const email = prompt('Admin email:');
+  if (!email) return;
+  const password = prompt('Admin password:');
+  if (!password) return;
 
   let { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error && error.status === 400) {
     const up = await supabase.auth.signUp({ email, password });
-    if (up.error) return alert("Sign-up failed: " + up.error.message);
+    if (up.error) return alert('Sign-up failed: ' + up.error.message);
     alert('Account created. In Supabase → Table Editor → profiles, set is_admin=true on your row, then sign in again.');
     return;
   }
-  if (error) return alert("Sign-in failed: " + error.message);
+  if (error) return alert('Sign-in failed: ' + error.message);
 
   await ensureProfile();
   await refreshAdminFlag();
   toggleAuthButtons();
   await reload();
 };
+
 els.logoutBtn.onclick = async () => {
   await supabase.auth.signOut();
   isAdmin = false;
@@ -319,14 +556,20 @@ els.logoutBtn.onclick = async () => {
   await reload();
 };
 
-/* ---- Boot ---- */
+/* ===== Feedback link ===== */
+
+els.feedbackLink?.addEventListener('click', e => {
+  e.preventDefault();
+  window.open(
+    'https://docs.google.com/forms/d/e/1FAIpQLSe-pZFxPiXsyy53qCLOuN82-9gplif_TpVXt_VF877b2G9W3w/viewform?usp=sharing&ouid=107599033470817781782',
+    '_blank',
+    'noopener'
+  );
+});
+
+/* ===== Boot ===== */
+
 setupFilters();
 await refreshAdminFlag().catch(console.warn);
 toggleAuthButtons();
 await reload();
-
-// Footer → Feedback link (use your real form link)
-els.feedbackLink?.addEventListener('click', (e) => {
-  e.preventDefault();
-  window.open('https://docs.google.com/forms/d/e/1FAIpQLSe-pZFxPiXsyy53qCLOuN82-9gplif_TpVXt_VF877b2G9W3w/viewform?usp=sharing&ouid=107599033470817781782', '_blank', 'noopener');
-});
