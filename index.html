@@ -21,13 +21,11 @@
     <h1>UIS Resource Hub</h1>
     <div class="sub">Find and share useful links for UIS courses.</div>
     <div class="row mt-12">
-      <input id="q" type="text" placeholder="Search by title, tag, or URL…" />
+      <input id="q" type="text" placeholder="Search by title, course, or URL…" />
       <!-- subject filter -->
       <select id="cat"></select>
       <!-- course filter -->
       <select id="sub"></select>
-      <!-- tags filter -->
-      <select id="tag"></select>
 
       <button id="addBtn" class="primary">＋ Add resource</button>
 
@@ -58,17 +56,34 @@
       <h3>Suggest a resource</h3>
 
       <div class="row">
-        <input id="titleI" type="text" placeholder="Title (e.g., Khan Academy – Algebra)" class="flex-2" />
-        <input id="urlI" type="url" placeholder="URL (https://…)" class="flex-2" />
+        <input
+          id="titleI"
+          type="text"
+          placeholder="Title (e.g., MHF4U Advanced Functions Notes)"
+          class="flex-2"
+        />
+        <input
+          id="urlI"
+          type="url"
+          placeholder="URL (https://…)"
+          class="flex-2"
+        />
       </div>
 
       <div class="row mt-8">
-        <!-- ONLY courses, no category field -->
+        <!-- Course + optional student name -->
         <select id="courseI"></select>
-        <input id="tagsI" type="text" placeholder="Tags (comma separated)" />
+        <input
+          id="nameI"
+          type="text"
+          placeholder="Your name (optional)"
+        />
       </div>
 
-      <textarea id="descI" placeholder="Why is this helpful? Short description…"></textarea>
+      <textarea
+        id="descI"
+        placeholder="Why is this helpful? Short description…"
+      ></textarea>
 
       <!-- Inline guidelines -->
       <div class="policy-inline">
@@ -129,7 +144,7 @@
       <span class="dot">•</span>
       <span class="muted small">Student-submitted; reviewed by staff.</span>
       <span class="dot">•</span>
-      <span class="version">v1.2</span>
+      <span class="version">v1.4</span>
     </div>
   </footer>
 </body>
