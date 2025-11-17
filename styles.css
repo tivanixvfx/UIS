@@ -1,4 +1,4 @@
-/* ==== UIS Resource Hub — DARK THEME (clean + robust) ==== */
+/* ==== UIS Resource Hub — DARK THEME ==== */
 :root{
   --brand:#4c6fff;      /* primary blue */
   --bg:#0b1220;         /* page bg */
@@ -18,7 +18,7 @@ body{
   line-height:1.35;
 }
 
-/* Global link defaults so even plain <a> look ok */
+/* Links */
 a{color:var(--brand); text-decoration:none}
 a:hover{text-decoration:underline}
 
@@ -29,7 +29,6 @@ h1{margin:0}
 
 .row{display:flex; gap:.5rem; flex-wrap:wrap; align-items:center}
 .justify-end{justify-content:flex-end}
-.justify-between{justify-content:space-between}
 .mt-12{margin-top:12px}
 .mt-8{margin-top:8px}
 .mtb-6-12{margin:6px 0 12px}
@@ -59,7 +58,8 @@ button.ghost:hover{background:#0f1a31}
 /* Chips / badges */
 .badge{
   background:#1e293b; color:#cbd5e1;
-  border-radius:999px; padding:4px 10px; margin:2px; display:inline-block; cursor:pointer;
+  border-radius:999px; padding:4px 10px; margin:2px;
+  display:inline-block; cursor:pointer;
 }
 
 /* Small text */
@@ -68,33 +68,66 @@ button.ghost:hover{background:#0f1a31}
 .dot{color:var(--muted)}
 
 /* Grid & cards */
-.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:1rem}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:1rem;
+}
 .card{
-  background:var(--card); border:1px solid var(--border);
-  padding:1rem; border-radius:14px;
+  background:var(--card);
+  border:1px solid var(--border);
+  padding:1rem;
+  border-radius:14px;
 }
 .footer{margin-top:.8rem}
 
 /* Footer */
-.site-footer{background:#0b1220; margin-top:2rem; padding:1rem 0; border-top:1px solid var(--border)}
-.footer-inner{display:flex; justify-content:center; align-items:center; gap:.5rem; flex-wrap:wrap}
+.site-footer{
+  background:#0b1220;
+  margin-top:2rem;
+  padding:1rem 0;
+  border-top:1px solid var(--border);
+}
+.footer-inner{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:.5rem;
+  flex-wrap:wrap;
+}
 .version{color:var(--muted)}
 
 /* Modal */
 .modal{
-  position:fixed; inset:0; display:grid; place-items:center;
-  background:rgba(7,10,20,.7); z-index:1000;
+  position:fixed;
+  inset:0;
+  display:grid;
+  place-items:center;
+  background:rgba(7,10,20,.7);
+  z-index:1000;
 }
 .sheet{
-  background:#101a31; color:var(--text);
-  border:1px solid #233051; border-radius:14px;
-  width:92%; max-width:720px; padding:1rem;
+  background:#101a31;
+  color:var(--text);
+  border:1px solid #233051;
+  border-radius:14px;
+  width:92%;
+  max-width:720px;
+  padding:1rem;
 }
-.hr{height:1px; background:#22314d; margin:10px 0}
+.hr{
+  height:1px;
+  background:#22314d;
+  margin:10px 0;
+}
 
 /* Inline guidelines */
 .policy-inline{
-  margin-top:10px; padding:10px; background:#0f1a31; border:1px dashed #233051; border-radius:12px;
+  margin-top:10px;
+  padding:10px;
+  background:#0f1a31;
+  border:1px dashed #233051;
+  border-radius:12px;
 }
 .policy-list li{margin:4px 0}
 
@@ -102,4 +135,15 @@ button.ghost:hover{background:#0f1a31}
 .pillbar{margin:.5rem 0}
 
 /* Pagination */
-.pagination{display:flex; gap:.5rem; align-items:center; margin-top:1rem}
+.pagination{
+  display:flex;
+  gap:.5rem;
+  align-items:center;
+  margin-top:1rem;
+}
+
+/* Helper for equal-width inputs in modal */
+.flex-2{
+  flex:2 1 0;
+  min-width:0;
+}
